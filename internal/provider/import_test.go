@@ -47,12 +47,11 @@ resource "quay_organization" "test" {
 				// Keep the resource alive by including its config, and import
 				// it by ID. The framework will not destroy between steps when
 				// Config is set.
-				Config:                  cfg,
-				ResourceName:            "quay_organization.test",
-				ImportState:             true,
-				ImportStateId:           orgName,
-				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"tag_expiration_s", "invoice_email", "invoice_email_address"},
+				Config:            cfg,
+				ResourceName:      "quay_organization.test",
+				ImportState:       true,
+				ImportStateId:     orgName,
+				ImportStateVerify: true,
 			},
 		},
 	})
