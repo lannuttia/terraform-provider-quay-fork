@@ -82,6 +82,62 @@ func TestTimeout(t *testing.T) {
 	}
 }
 
+// ----- Retry behaviour ----------------------------------------------------
+
+// TestRetry_GET5xx verifies that GET requests are retried on transient 5xx errors.
+func TestRetry_GET5xx(t *testing.T) {
+	attempts := 0
+	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts < 3 {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"message": "unavailable"})
+			return
+		}
+		writeJSON(w, http.StatusOK, client.Repository{Namespace: "org", Name: "repo"})
+	})
+	_, err := c.GetRepository(context.Background(), "org/repo")
+	if err != nil {
+		t.Fatalf("expected success after retries, got: %v", err)
+	}
+	if attempts != 3 {
+		t.Errorf("expected 3 attempts, got %d", attempts)
+	}
+}
+
+// TestRetry_POST5xx verifies that POST requests are NOT retried on 5xx errors,
+// since a committed POST may have already mutated server state.
+func TestRetry_POST5xx(t *testing.T) {
+	attempts := 0
+	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"message": "unavailable"})
+	})
+	_, err := c.CreateOrganization(context.Background(), client.CreateOrganizationRequest{Name: "org", Email: "a@b.com"})
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if attempts != 1 {
+		t.Errorf("POST should not be retried: expected 1 attempt, got %d", attempts)
+	}
+}
+
+// TestRetry_429 verifies that 429 Too Many Requests is not retried, since
+// retrying immediately would only worsen the rate limiting situation.
+func TestRetry_429(t *testing.T) {
+	attempts := 0
+	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		writeJSON(w, http.StatusTooManyRequests, map[string]string{"message": "rate limited"})
+	})
+	_, err := c.GetRepository(context.Background(), "org/repo")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if attempts != 1 {
+		t.Errorf("429 should not be retried: expected 1 attempt, got %d", attempts)
+	}
+}
+
 // ----- Authorization header -----------------------------------------------
 
 func TestAuthorizationHeader(t *testing.T) {

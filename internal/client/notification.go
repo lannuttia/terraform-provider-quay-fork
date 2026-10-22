@@ -68,17 +68,3 @@ func (c *Client) DeleteRepoNotification(ctx context.Context, repository, uuid st
 	}
 	return nil
 }
-
-func (c *Client) ResetRepoNotificationFailures(ctx context.Context, repository, uuid string) error {
-	if err := c.post(ctx, fmt.Sprintf("repository/%s/notification/%s", repository, uuid), nil, nil); err != nil {
-		return fmt.Errorf("resetting notification failures for %q on repository %q: %w", uuid, repository, err)
-	}
-	return nil
-}
-
-func (c *Client) TestRepoNotification(ctx context.Context, repository, uuid string) error {
-	if err := c.post(ctx, fmt.Sprintf("repository/%s/notification/%s/test", repository, uuid), nil, nil); err != nil {
-		return fmt.Errorf("testing notification %q on repository %q: %w", uuid, repository, err)
-	}
-	return nil
-}

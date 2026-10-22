@@ -130,8 +130,11 @@ func (c *Client) newRequest(ctx context.Context, method, path string, body any) 
 	return req, nil
 }
 
-// retryableStatusCodes are server-side transient errors worth retrying.
-var retryableStatusCodes = map[int]bool{
+// retryable5xxCodes are transient server errors that are safe to retry only
+// for idempotent methods (GET, PUT, DELETE). POST is excluded because a
+// committed POST may have already mutated server state, so retrying could
+// create duplicate resources.
+var retryable5xxCodes = map[int]bool{
 	http.StatusInternalServerError: true,
 	http.StatusBadGateway:          true,
 	http.StatusServiceUnavailable:  true,
@@ -171,9 +174,16 @@ func (c *Client) do(req *http.Request, out any) error {
 			return nil
 		}
 		var apiErr *APIError
-		if !errors.As(lastErr, &apiErr) || !retryableStatusCodes[apiErr.StatusCode] {
+		if !errors.As(lastErr, &apiErr) {
 			return lastErr
 		}
+		// 5xx transient errors are only retried for idempotent methods.
+		// POST is excluded: a committed POST may have already mutated state.
+		// 429 is not retried: immediately retrying would worsen rate limiting.
+		if req.Method != http.MethodPost && retryable5xxCodes[apiErr.StatusCode] {
+			continue
+		}
+		return lastErr
 	}
 	return lastErr
 }
