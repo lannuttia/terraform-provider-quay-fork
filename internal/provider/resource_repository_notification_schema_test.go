@@ -4,17 +4,17 @@ import (
 	"context"
 	"testing"
 
-	"github.com/hashicorp/terraform-plugin-framework/resource"
+	fwresource "github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	provider "github.com/lannuttia/terraform-provider-quay/internal/provider"
 )
 
 // schemaFor returns the schema of a resource produced by the given factory.
-func schemaFor(t *testing.T, factory func() resource.Resource) schema.Schema {
+func schemaFor(t *testing.T, factory func() fwresource.Resource) schema.Schema {
 	t.Helper()
 	r := factory()
-	var resp resource.SchemaResponse
-	r.Schema(context.Background(), resource.SchemaRequest{}, &resp)
+	var resp fwresource.SchemaResponse
+	r.Schema(context.Background(), fwresource.SchemaRequest{}, &resp)
 	return resp.Schema
 }
 
@@ -39,6 +39,58 @@ func nestedAttr(t *testing.T, s schema.Schema, path ...string) schema.Attribute 
 		}
 	}
 	return cur
+}
+
+// TestNotificationSchema_QuayNotificationTarget asserts that the
+// quay_notification method block has a required nested "target" attribute
+// containing "kind" and "name" child attributes.
+//
+// Without a target the Quay API always returns 400 "Missing target", so
+// accepting a quay_notification block with no target means creates always fail
+// with an opaque API error — not a clear plan-time validation message.
+func TestNotificationSchema_QuayNotificationTarget(t *testing.T) {
+	s := schemaFor(t, provider.NewRepositoryNotificationResource)
+
+	// quay_notification must exist and be a SingleNestedAttribute.
+	qnRaw, ok := s.Attributes["quay_notification"]
+	if !ok {
+		t.Fatal("quay_notification attribute not found in schema")
+	}
+	qn, ok := qnRaw.(schema.SingleNestedAttribute)
+	if !ok {
+		t.Fatalf("quay_notification: expected schema.SingleNestedAttribute, got %T", qnRaw)
+	}
+
+	// It must contain a "target" child attribute.
+	targetRaw, ok := qn.Attributes["target"]
+	if !ok {
+		t.Fatal("quay_notification.target attribute is missing — Quay returns 400 \"Missing target\" when no target is provided")
+	}
+
+	target, ok := targetRaw.(schema.SingleNestedAttribute)
+	if !ok {
+		t.Fatalf("quay_notification.target: expected schema.SingleNestedAttribute, got %T", targetRaw)
+	}
+	if !target.Required {
+		t.Error("quay_notification.target must be Required")
+	}
+
+	// target must contain both "kind" and "name".
+	for _, child := range []string{"kind", "name"} {
+		childRaw, ok := target.Attributes[child]
+		if !ok {
+			t.Errorf("quay_notification.target.%s attribute is missing", child)
+			continue
+		}
+		strAttr, ok := childRaw.(schema.StringAttribute)
+		if !ok {
+			t.Errorf("quay_notification.target.%s: expected schema.StringAttribute, got %T", child, childRaw)
+			continue
+		}
+		if !strAttr.Required {
+			t.Errorf("quay_notification.target.%s must be Required", child)
+		}
+	}
 }
 
 // TestNotificationSchema_SensitiveFields asserts that credential-bearing

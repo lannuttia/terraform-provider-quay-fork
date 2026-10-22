@@ -83,7 +83,17 @@ type FlowdockConfig struct {
 	FlowAPIToken types.String `tfsdk:"flow_api_token"`
 }
 
-type QuayNotificationConfig struct{}
+// QuayNotificationTarget identifies the Quay user or team to notify.
+// Quay's API requires this inside config.target; without it the API returns
+// 400 "Missing target".
+type QuayNotificationTarget struct {
+	Kind types.String `tfsdk:"kind"`
+	Name types.String `tfsdk:"name"`
+}
+
+type QuayNotificationConfig struct {
+	Target QuayNotificationTarget `tfsdk:"target"`
+}
 
 // Event types
 // Events with no configuration use an empty struct so the block is still
@@ -247,7 +257,25 @@ func (r *RepositoryNotificationResource) Schema(_ context.Context, _ resource.Sc
 				Optional:      true,
 				Description:   "Deliver notifications via the built-in Quay notification system.",
 				PlanModifiers: requiresReplaceObj,
-				Attributes:    map[string]schema.Attribute{},
+				Attributes: map[string]schema.Attribute{
+					"target": schema.SingleNestedAttribute{
+						Required:      true,
+						Description:   "The Quay user or team to notify.",
+						PlanModifiers: requiresReplaceObj,
+						Attributes: map[string]schema.Attribute{
+							"kind": schema.StringAttribute{
+								Required:      true,
+								Description:   `The kind of target. One of: "user" or "team".`,
+								PlanModifiers: requiresReplaceStr,
+							},
+							"name": schema.StringAttribute{
+								Required:      true,
+								Description:   "The username or team name to notify.",
+								PlanModifiers: requiresReplaceStr,
+							},
+						},
+					},
+				},
 			},
 
 			// ----- event blocks -----
@@ -475,7 +503,12 @@ func (m *RepositoryNotificationResourceModel) methodAndConfig() (string, map[str
 	case m.Flowdock != nil:
 		return "flowdock", map[string]any{"flow_api_token": m.Flowdock.FlowAPIToken.ValueString()}
 	case m.QuayNotification != nil:
-		return "quay_notification", map[string]any{}
+		return "quay_notification", map[string]any{
+			"target": map[string]any{
+				"kind": m.QuayNotification.Target.Kind.ValueString(),
+				"name": m.QuayNotification.Target.Name.ValueString(),
+			},
+		}
 	default:
 		// ConfigValidators guarantees this is unreachable.
 		return "", map[string]any{}
@@ -555,7 +588,19 @@ func (r *RepositoryNotificationResource) mapToState(notif *client.Notification, 
 	case "flowdock":
 		state.Flowdock = &FlowdockConfig{FlowAPIToken: types.StringValue(stringFromConfig(notif.Config, "flow_api_token"))}
 	case "quay_notification":
-		state.QuayNotification = &QuayNotificationConfig{}
+		target, _ := notif.Config["target"].(map[string]any)
+		kind := ""
+		name := ""
+		if target != nil {
+			kind = fmt.Sprintf("%v", target["kind"])
+			name = fmt.Sprintf("%v", target["name"])
+		}
+		state.QuayNotification = &QuayNotificationConfig{
+			Target: QuayNotificationTarget{
+				Kind: types.StringValue(kind),
+				Name: types.StringValue(name),
+			},
+		}
 	default:
 		diags.AddError("Unknown Notification Method",
 			fmt.Sprintf("The Quay API returned an unrecognised notification method %q. "+

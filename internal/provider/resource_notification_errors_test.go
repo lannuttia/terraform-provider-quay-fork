@@ -120,6 +120,29 @@ resource "quay_repository_notification" "bad" {
 	})
 }
 
+// TestAccRepositoryNotification_QuayNotificationMissingTarget asserts that
+// supplying a quay_notification block without a target is rejected at plan
+// time. Without a target the Quay API always returns 400 "Missing target",
+// so the schema enforces it as Required to surface the error before any API
+// call is made.
+func TestAccRepositoryNotification_QuayNotificationMissingTarget(t *testing.T) {
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: providerFactories(),
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig() + `
+resource "quay_repository_notification" "bad" {
+  repository        = "myorg/myrepo"
+  quay_notification = {}
+  repo_push         = {}
+}
+`,
+				ExpectError: regexp.MustCompile(`(?i)(required|missing|target)`),
+			},
+		},
+	})
+}
+
 func TestAccRepositoryNotification_RepositoryNotFound(t *testing.T) {
 	skipIfNoAcc(t)
 	resource.Test(t, resource.TestCase{
