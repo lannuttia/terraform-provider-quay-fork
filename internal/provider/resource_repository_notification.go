@@ -83,9 +83,9 @@ type FlowdockConfig struct {
 	FlowAPIToken types.String `tfsdk:"flow_api_token"`
 }
 
-// QuayNotificationTarget identifies the Quay user or team to notify.
-// Quay's API requires this inside config.target; without it the API returns
-// 400 "Missing target".
+// QuayNotificationTarget identifies the Quay user or team to receive an
+// in-app alert in the Quay web UI. Quay's API requires this inside
+// config.target; without it the API returns 400 "Missing target".
 type QuayNotificationTarget struct {
 	Kind types.String `tfsdk:"kind"`
 	Name types.String `tfsdk:"name"`
@@ -255,22 +255,22 @@ func (r *RepositoryNotificationResource) Schema(_ context.Context, _ resource.Sc
 			},
 			"quay_notification": schema.SingleNestedAttribute{
 				Optional:      true,
-				Description:   "Deliver notifications via the built-in Quay notification system.",
+				Description:   "Deliver notifications as in-app alerts in the Quay web UI to a specific user or team. The recipient must be a member of the repository's namespace.",
 				PlanModifiers: requiresReplaceObj,
 				Attributes: map[string]schema.Attribute{
 					"target": schema.SingleNestedAttribute{
 						Required:      true,
-						Description:   "The Quay user or team to notify.",
+						Description:   "The Quay user or team to send the in-app notification to.",
 						PlanModifiers: requiresReplaceObj,
 						Attributes: map[string]schema.Attribute{
 							"kind": schema.StringAttribute{
 								Required:      true,
-								Description:   `The kind of target. One of: "user" or "team".`,
+								Description:   `The kind of target: "user" to notify an individual Quay account, or "team" to notify all members of an organization team.`,
 								PlanModifiers: requiresReplaceStr,
 							},
 							"name": schema.StringAttribute{
 								Required:      true,
-								Description:   "The username or team name to notify.",
+								Description:   "The Quay username or team name to notify.",
 								PlanModifiers: requiresReplaceStr,
 							},
 						},
