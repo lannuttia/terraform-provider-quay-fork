@@ -78,7 +78,7 @@ resource "quay_repository_notification" "main_build_email" {
 - `email` (Attributes) Deliver notifications by email. (see [below for nested schema](#nestedatt--email))
 - `flowdock` (Attributes) Deliver notifications to a Flowdock flow. (see [below for nested schema](#nestedatt--flowdock))
 - `hipchat` (Attributes) Deliver notifications to a HipChat room. (see [below for nested schema](#nestedatt--hipchat))
-- `quay_notification` (Attributes) Deliver notifications via the built-in Quay notification system. (see [below for nested schema](#nestedatt--quay_notification))
+- `quay_notification` (Attributes) Deliver notifications as in-app alerts in the Quay web UI to a specific user or team. The recipient must be a member of the repository's namespace. (see [below for nested schema](#nestedatt--quay_notification))
 - `repo_mirror_sync_failed` (Attributes) Trigger when a repository mirror sync fails. (see [below for nested schema](#nestedatt--repo_mirror_sync_failed))
 - `repo_mirror_sync_started` (Attributes) Trigger when a repository mirror sync starts. (see [below for nested schema](#nestedatt--repo_mirror_sync_started))
 - `repo_mirror_sync_success` (Attributes) Trigger when a repository mirror sync succeeds. (see [below for nested schema](#nestedatt--repo_mirror_sync_success))
@@ -147,7 +147,7 @@ Required:
 
 Required:
 
-- `flow_api_token` (String) The Flowdock flow API token.
+- `flow_api_token` (String, Sensitive) The Flowdock flow API token.
 
 
 <a id="nestedatt--hipchat"></a>
@@ -155,12 +155,25 @@ Required:
 
 Required:
 
-- `notification_token` (String) The HipChat API notification token.
+- `notification_token` (String, Sensitive) The HipChat API notification token.
 - `room_id` (String) The HipChat room ID.
 
 
 <a id="nestedatt--quay_notification"></a>
 ### Nested Schema for `quay_notification`
+
+Required:
+
+- `target` (Attributes) The Quay user or team to send the in-app notification to. (see [below for nested schema](#nestedatt--quay_notification--target))
+
+<a id="nestedatt--quay_notification--target"></a>
+### Nested Schema for `quay_notification.target`
+
+Required:
+
+- `kind` (String) The kind of target: "user" to notify an individual Quay account, or "team" to notify all members of an organization team.
+- `name` (String) The Quay username or team name to notify.
+
 
 
 <a id="nestedatt--repo_mirror_sync_failed"></a>
@@ -184,7 +197,7 @@ Required:
 
 Required:
 
-- `url` (String) The Slack Incoming Webhook URL.
+- `url` (String, Sensitive) The Slack Incoming Webhook URL. Marked sensitive because the URL itself is the credential.
 
 
 <a id="nestedatt--vulnerability_found"></a>
@@ -192,7 +205,7 @@ Required:
 
 Required:
 
-- `level` (String) The minimum vulnerability severity level that triggers the notification. One of: Low, Medium, High, Critical.
+- `level` (Number) The minimum vulnerability severity level index that triggers the notification (0=Critical, 1=High, 2=Medium, 3=Low, 4=Negligible, 5=Unknown).
 
 
 <a id="nestedatt--webhook"></a>
@@ -200,7 +213,7 @@ Required:
 
 Required:
 
-- `url` (String) The URL to POST the notification payload to.
+- `url` (String, Sensitive) The URL to POST the notification payload to. Marked sensitive because webhook URLs frequently embed authentication tokens.
 
 ## Import
 
