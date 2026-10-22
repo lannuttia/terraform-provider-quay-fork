@@ -1,6 +1,7 @@
 package provider_test
 
 import (
+	"context"
 	"fmt"
 	"regexp"
 	"testing"
@@ -54,6 +55,64 @@ data "quay_organization" "missing" {
 }
 `,
 				ExpectError: regexp.MustCompile(`(?i)(not found|404|Error Reading Organization)`),
+			},
+		},
+	})
+}
+
+// TestAccOrganization_PostCreateUpdateFailureOrphansOrg reproduces the bug
+// described by jbpratt: when the post-create PUT fails (e.g. because
+// tag_expiration_s holds a value Quay rejects), the org is created in Quay
+// but state is never saved. The next apply then fails with "already exists"
+// because the org exists in Quay but Terraform treats it as new.
+//
+// The fix is to save state immediately after the successful POST, so that even
+// if the follow-up PUT fails the org is tracked and subsequent plans can
+// reconcile or update it.
+func TestAccOrganization_PostCreateUpdateFailureOrphansOrg(t *testing.T) {
+	skipIfNoAcc(t)
+	orgName := rname("tf-acc-orphan-org")
+
+	// Best-effort cleanup: delete the org even if it ended up orphaned in Quay
+	// without any Terraform state. This runs after the test (and after any
+	// CheckDestroy), so any state-managed destroy has already fired.
+	t.Cleanup(func() {
+		_ = quayClient().DeleteOrganization(context.Background(), orgName)
+	})
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: providerFactories(),
+		Steps: []resource.TestStep{
+			// Step 1: Create with an invalid tag_expiration_s value that Quay
+			// will reject (e.g. 999 is not in TAG_EXPIRATION_OPTIONS). The POST
+			// to create the org succeeds, but the follow-up PUT fails. With the
+			// bug present, state is never saved and the org is orphaned.
+			{
+				Config: providerConfig() + fmt.Sprintf(`
+resource "quay_organization" "orphan" {
+  name             = %q
+  email            = "orphan@example.com"
+  tag_expiration_s = 999
+}
+`, orgName),
+				ExpectError: regexp.MustCompile(`(?i)(Error Configuring Organization|tag_expiration_s|400|invalid)`),
+			},
+			// Step 2: After the failed apply, re-apply with a valid config (no
+			// tag_expiration_s). With the bug present the org already exists in
+			// Quay but has no Terraform state, so the provider tries to re-create
+			// it and Quay returns "already exists" / 400. With the fix applied,
+			// the org is in state from Step 1 and this apply succeeds cleanly.
+			{
+				Config: providerConfig() + fmt.Sprintf(`
+resource "quay_organization" "orphan" {
+  name  = %q
+  email = "orphan@example.com"
+}
+`, orgName),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("quay_organization.orphan", "name", orgName),
+					resource.TestCheckResourceAttr("quay_organization.orphan", "email", "orphan@example.com"),
+				),
 			},
 		},
 	})

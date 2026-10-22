@@ -121,8 +121,23 @@ func (r *OrganizationResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	// Apply any update-only fields immediately after create
-	needsUpdate := !plan.InvoiceEmail.IsNull() || !plan.InvoiceEmailAddress.IsNull() || !plan.TagExpirationS.IsNull()
+	// Save state immediately after the successful POST so the org is tracked
+	// even if the follow-up PUT fails. Without this, a failed PUT orphans the
+	// org in Quay with no Terraform state — every subsequent apply then fails
+	// with "already exists" because the provider tries to re-create it.
+	r.mapToState(org, &plan)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
+	// Apply any update-only fields (those not accepted by the create endpoint)
+	// immediately after create. Only send the PUT when the user explicitly set
+	// a value — guard against unknown values (computed fields not yet resolved)
+	// which are non-null but have no user-supplied value.
+	needsUpdate := (!plan.InvoiceEmail.IsNull() && !plan.InvoiceEmail.IsUnknown()) ||
+		(!plan.InvoiceEmailAddress.IsNull() && !plan.InvoiceEmailAddress.IsUnknown()) ||
+		(!plan.TagExpirationS.IsNull() && !plan.TagExpirationS.IsUnknown())
 	if needsUpdate {
 		updateReq := client.UpdateOrganizationRequest{
 			Email:               plan.Email.ValueString(),
@@ -135,10 +150,9 @@ func (r *OrganizationResource) Create(ctx context.Context, req resource.CreateRe
 			resp.Diagnostics.AddError("Error Configuring Organization", err.Error())
 			return
 		}
+		r.mapToState(org, &plan)
+		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	}
-
-	r.mapToState(org, &plan)
-	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
 func (r *OrganizationResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
