@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"fmt"
+	"net/url"
 )
 
 // Visibility values accepted by the Quay API.
@@ -79,4 +80,53 @@ func (c *Client) DeleteRepository(ctx context.Context, repository string) error 
 		return fmt.Errorf("deleting repository %q: %w", repository, err)
 	}
 	return nil
+}
+
+// DeleteTag permanently deletes a tag from a repository.
+func (c *Client) DeleteTag(ctx context.Context, repository, tag string) error {
+	if err := c.delete(ctx, fmt.Sprintf("repository/%s/tag/%s", repository, tag)); err != nil {
+		return fmt.Errorf("deleting tag %q from repository %q: %w", tag, repository, err)
+	}
+	return nil
+}
+
+// tagListResponse is the shape of GET repository/<ns>/<name>/tag/.
+type tagListResponse struct {
+	Tags []map[string]any `json:"tags"`
+}
+
+// HasRepositoryTags reports whether the repository has at least one active tag.
+// It returns (false, nil) when the repository does not exist (404).
+func (c *Client) HasRepositoryTags(ctx context.Context, repository string) (bool, error) {
+	// Build the path and append the raw query string ourselves so that the
+	// question mark is not percent-encoded by url.JoinPath.
+	path := fmt.Sprintf("repository/%s/tag/?onlyActiveTags=true&limit=1", repository)
+	var resp tagListResponse
+	if err := c.get(ctx, path, &resp); err != nil {
+		if IsNotFound(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("listing tags for repository %q: %w", repository, err)
+	}
+	return len(resp.Tags) > 0, nil
+}
+
+// repoListResponse is the shape of GET repository?namespace=<name>.
+type repoListResponse struct {
+	Repositories []map[string]any `json:"repositories"`
+}
+
+// HasOrganizationRepositories reports whether the organization namespace
+// contains at least one repository.
+func (c *Client) HasOrganizationRepositories(ctx context.Context, name string) (bool, error) {
+	// Append the raw query string ourselves so the ? is not escaped.
+	path := fmt.Sprintf("repository?namespace=%s", url.QueryEscape(name))
+	var resp repoListResponse
+	if err := c.get(ctx, path, &resp); err != nil {
+		if IsNotFound(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("listing repositories for organization %q: %w", name, err)
+	}
+	return len(resp.Repositories) > 0, nil
 }

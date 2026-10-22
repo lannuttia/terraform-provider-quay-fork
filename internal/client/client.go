@@ -89,9 +89,22 @@ func IsForbidden(err error) bool {
 }
 
 func (c *Client) newRequest(ctx context.Context, method, path string, body any) (*http.Request, error) {
-	u, err := url.JoinPath(c.baseURL, "/api/v1/", path)
+	// Split off any raw query string before joining the path, because
+	// url.JoinPath percent-encodes '?' which causes Quay to treat it as part
+	// of the path rather than a query delimiter.
+	rawPath := path
+	rawQuery := ""
+	if idx := strings.IndexByte(path, '?'); idx >= 0 {
+		rawPath = path[:idx]
+		rawQuery = path[idx+1:]
+	}
+
+	u, err := url.JoinPath(c.baseURL, "/api/v1/", rawPath)
 	if err != nil {
 		return nil, fmt.Errorf("building URL: %w", err)
+	}
+	if rawQuery != "" {
+		u += "?" + rawQuery
 	}
 
 	var bodyReader io.Reader

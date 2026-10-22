@@ -1,10 +1,13 @@
 package provider_test
 
 import (
+	"context"
 	"fmt"
+	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
 func TestAccRepository_basic(t *testing.T) {
@@ -109,6 +112,75 @@ data "quay_repository" "test" {
 					resource.TestCheckResourceAttr("data.quay_repository.test", "visibility", "private"),
 					resource.TestCheckResourceAttr("data.quay_repository.test", "description", "datasource test"),
 				),
+			},
+		},
+	})
+}
+
+func TestAccRepository_DeleteNonEmpty(t *testing.T) {
+	skipIfNoAcc(t)
+	orgName := rname("tf-acc-nodel-repo-org")
+	repoPath := orgName + "/nodel-repo"
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: providerFactories(),
+		CheckDestroy: resource.ComposeTestCheckFunc(
+			checkRepositoryDestroyed(repoPath),
+			checkOrganizationDestroyed(orgName),
+		),
+		Steps: []resource.TestStep{
+			// Create the org and repository, then push a real image tag so the
+			// repository is non-empty when the destroy runs.
+			{
+				Config: providerConfig() + fmt.Sprintf(`
+resource "quay_organization" "test" {
+  name  = %q
+  email = "tf-acc-nodel-repo@example.com"
+}
+resource "quay_repository" "test" {
+  namespace  = quay_organization.test.name
+  name       = "nodel-repo"
+  visibility = "private"
+}
+`, orgName),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("quay_repository.test", "name", "nodel-repo"),
+					func(_ *terraform.State) error {
+						pushImageToQuay(t, repoPath, "latest")
+						return nil
+					},
+				),
+			},
+			// Remove the repository block. It contains a tag so the provider
+			// must refuse to destroy it.
+			{
+				Config: providerConfig() + fmt.Sprintf(`
+resource "quay_organization" "test" {
+  name  = %q
+  email = "tf-acc-nodel-repo@example.com"
+}
+`, orgName),
+				ExpectError: regexp.MustCompile(`(?i)(non-empty|contains active tags|cannot delete)`),
+			},
+			// Delete the tag out-of-band so the repository is empty, then let
+			// Terraform destroy the now-empty repository and organization cleanly.
+			{
+				Config: providerConfig() + fmt.Sprintf(`
+resource "quay_organization" "test" {
+  name  = %q
+  email = "tf-acc-nodel-repo@example.com"
+}
+resource "quay_repository" "test" {
+  namespace  = quay_organization.test.name
+  name       = "nodel-repo"
+  visibility = "private"
+}
+`, orgName),
+				PreConfig: func() {
+					if err := quayClient().DeleteTag(context.Background(), repoPath, "latest"); err != nil {
+						t.Fatalf("deleting tag for cleanup: %v", err)
+					}
+				},
 			},
 		},
 	})

@@ -203,7 +203,34 @@ func (r *OrganizationResource) Delete(ctx context.Context, req resource.DeleteRe
 		return
 	}
 
-	err := r.client.DeleteOrganization(ctx, state.Name.ValueString())
+	// Refuse to delete an organization that still contains repositories. Quay
+	// immediately removes every repository, image, robot account, team and
+	// OAuth application with no grace period — including resources not managed
+	// by Terraform. This is a hard guard with no opt-out. Remove all
+	// repositories from the organization first, then destroy.
+	hasRepos, err := r.client.HasOrganizationRepositories(ctx, state.Name.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Error Checking Organization Repositories", err.Error())
+		return
+	}
+	if hasRepos {
+		resp.Diagnostics.AddError(
+			"Cannot Delete Non-Empty Organization",
+			fmt.Sprintf(
+				"Organization %q still contains repositories. Deleting it would permanently "+
+					"destroy every repository, image, robot account, team and OAuth application "+
+					"in the organization — including resources not managed by Terraform — "+
+					"with no grace period.\n\n"+
+					"Remove all repositories from the organization before destroying it. "+
+					"Note that changing `name` also triggers a replace (delete + create) "+
+					"which would delete all content.",
+				state.Name.ValueString(),
+			),
+		)
+		return
+	}
+
+	err = r.client.DeleteOrganization(ctx, state.Name.ValueString())
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error Deleting Organization", err.Error())
 	}

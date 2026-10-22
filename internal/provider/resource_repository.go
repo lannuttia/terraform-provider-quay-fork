@@ -177,7 +177,30 @@ func (r *RepositoryResource) Delete(ctx context.Context, req resource.DeleteRequ
 		return
 	}
 
-	err := r.client.DeleteRepository(ctx, state.ID.ValueString())
+	// Refuse to delete a repository that still contains active tags. Quay
+	// purges content immediately with no grace period, so this is a hard guard
+	// with no opt-out. Empty the repository first, then destroy.
+	hasTags, err := r.client.HasRepositoryTags(ctx, state.ID.ValueString())
+	if err != nil {
+		resp.Diagnostics.AddError("Error Checking Repository Tags", err.Error())
+		return
+	}
+	if hasTags {
+		resp.Diagnostics.AddError(
+			"Cannot Delete Non-Empty Repository",
+			fmt.Sprintf(
+				"Repository %q contains active tags and images. Deleting it would "+
+					"permanently destroy all content with no grace period.\n\n"+
+					"Remove all tags from the repository before destroying it. "+
+					"Note that changing `name` or `namespace` also triggers a replace "+
+					"(delete + create) which would delete all content.",
+				state.ID.ValueString(),
+			),
+		)
+		return
+	}
+
+	err = r.client.DeleteRepository(ctx, state.ID.ValueString())
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error Deleting Repository", err.Error())
 	}

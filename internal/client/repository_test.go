@@ -115,3 +115,140 @@ func TestDeleteRepository(t *testing.T) {
 		t.Error("DELETE was never called")
 	}
 }
+
+// ── HasRepositoryTags ──────────────────────────────────────────────────────
+
+func TestHasRepositoryTags_NonEmpty(t *testing.T) {
+	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || !strings.Contains(r.URL.Path, "/tag/") {
+			http.NotFound(w, r)
+			return
+		}
+		if got := r.URL.Query().Get("onlyActiveTags"); got != "true" {
+			t.Errorf("onlyActiveTags: want %q, got %q", "true", got)
+		}
+		if got := r.URL.Query().Get("limit"); got != "1" {
+			t.Errorf("limit: want %q, got %q", "1", got)
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"tags": []map[string]any{{"name": "latest"}},
+		})
+	})
+
+	hasTags, err := c.HasRepositoryTags(context.Background(), "myorg/myrepo")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !hasTags {
+		t.Error("want true for a repository with tags, got false")
+	}
+}
+
+func TestHasRepositoryTags_Empty(t *testing.T) {
+	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{"tags": []any{}})
+	})
+
+	hasTags, err := c.HasRepositoryTags(context.Background(), "myorg/myrepo")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hasTags {
+		t.Error("want false for a repository with no tags, got true")
+	}
+}
+
+func TestHasRepositoryTags_NotFound(t *testing.T) {
+	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusNotFound, map[string]string{"message": "not found"})
+	})
+
+	hasTags, err := c.HasRepositoryTags(context.Background(), "myorg/missing")
+	if err != nil {
+		t.Fatalf("want (false, nil) for a missing repository, got error: %v", err)
+	}
+	if hasTags {
+		t.Error("want false for a missing repository, got true")
+	}
+}
+
+func TestHasRepositoryTags_QueryStringNotEscaped(t *testing.T) {
+	var gotRawQuery string
+	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		gotRawQuery = r.URL.RawQuery
+		writeJSON(w, http.StatusOK, map[string]any{"tags": []any{}})
+	})
+
+	_, _ = c.HasRepositoryTags(context.Background(), "myorg/myrepo")
+
+	if !strings.Contains(gotRawQuery, "onlyActiveTags=true") {
+		t.Errorf("want raw query to contain 'onlyActiveTags=true', got %q", gotRawQuery)
+	}
+}
+
+// ── HasOrganizationRepositories ────────────────────────────────────────────
+
+func TestHasOrganizationRepositories_NonEmpty(t *testing.T) {
+	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.NotFound(w, r)
+			return
+		}
+		if got := r.URL.Query().Get("namespace"); got == "" {
+			t.Error("want namespace query parameter, got none")
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"repositories": []map[string]any{{"name": "some-repo"}},
+		})
+	})
+
+	hasRepos, err := c.HasOrganizationRepositories(context.Background(), "myorg")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !hasRepos {
+		t.Error("want true for an org with repositories, got false")
+	}
+}
+
+func TestHasOrganizationRepositories_Empty(t *testing.T) {
+	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{"repositories": []any{}})
+	})
+
+	hasRepos, err := c.HasOrganizationRepositories(context.Background(), "myorg")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if hasRepos {
+		t.Error("want false for an org with no repositories, got true")
+	}
+}
+
+func TestHasOrganizationRepositories_NotFound(t *testing.T) {
+	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusNotFound, map[string]string{"message": "not found"})
+	})
+
+	hasRepos, err := c.HasOrganizationRepositories(context.Background(), "missing-org")
+	if err != nil {
+		t.Fatalf("want (false, nil) for a missing org, got error: %v", err)
+	}
+	if hasRepos {
+		t.Error("want false for a missing org, got true")
+	}
+}
+
+func TestHasOrganizationRepositories_QueryStringNotEscaped(t *testing.T) {
+	var gotRawQuery string
+	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		gotRawQuery = r.URL.RawQuery
+		writeJSON(w, http.StatusOK, map[string]any{"repositories": []any{}})
+	})
+
+	_, _ = c.HasOrganizationRepositories(context.Background(), "myorg")
+
+	if !strings.Contains(gotRawQuery, "namespace=myorg") {
+		t.Errorf("want raw query to contain 'namespace=myorg', got %q", gotRawQuery)
+	}
+}
