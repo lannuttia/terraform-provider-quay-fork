@@ -231,11 +231,15 @@ resource "quay_repository" "test" {
 	})
 }
 
+// TestAccRepository_DeletedOutOfBand verifies that when a repository is
+// deleted outside of Terraform, a subsequent refresh removes it from state
+// and produces a non-empty plan (Terraform wants to recreate it).
 func TestAccRepository_DeletedOutOfBand(t *testing.T) {
 	skipIfNoAcc(t)
 	orgName := rname("tf-acc-oob-repo-org")
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: providerFactories(),
+		CheckDestroy:             checkOrganizationDestroyed(orgName),
 		Steps: []resource.TestStep{
 			{
 				Config: providerConfig() + fmt.Sprintf(`
@@ -254,7 +258,19 @@ resource "quay_repository" "oob" {
 					resource.TestCheckResourceAttr("quay_repository.oob", "name", "oob-repo"),
 				),
 			},
-			{RefreshState: true},
+			{
+				// Delete the repository out-of-band, then refresh. Read gets
+				// a 404 and removes the resource from state, so Terraform
+				// reports a non-empty plan (it wants to recreate the repo).
+				PreConfig: func() {
+					repoPath := orgName + "/oob-repo"
+					if err := quayClient().DeleteRepository(t.Context(), repoPath); err != nil {
+						t.Fatalf("deleting repository out-of-band: %v", err)
+					}
+				},
+				RefreshState:       true,
+				ExpectNonEmptyPlan: true,
+			},
 		},
 	})
 }

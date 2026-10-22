@@ -118,6 +118,9 @@ resource "quay_organization" "orphan" {
 	})
 }
 
+// TestAccOrganization_DeletedOutOfBand verifies that when an organization is
+// deleted outside of Terraform, a subsequent refresh removes it from state
+// and produces a non-empty plan (Terraform wants to recreate it).
 func TestAccOrganization_DeletedOutOfBand(t *testing.T) {
 	skipIfNoAcc(t)
 	orgName := rname("tf-acc-oob-org")
@@ -136,7 +139,16 @@ resource "quay_organization" "oob" {
 				),
 			},
 			{
-				RefreshState: true,
+				// Delete the organization out-of-band, then refresh. Read gets
+				// a 404 and removes the resource from state, so Terraform
+				// reports a non-empty plan (it wants to recreate the org).
+				PreConfig: func() {
+					if err := quayClient().DeleteOrganization(t.Context(), orgName); err != nil {
+						t.Fatalf("deleting organization out-of-band: %v", err)
+					}
+				},
+				RefreshState:       true,
+				ExpectNonEmptyPlan: true,
 			},
 		},
 	})
