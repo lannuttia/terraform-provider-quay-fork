@@ -181,7 +181,8 @@ func (r *RepositoryNotificationResource) Schema(_ context.Context, _ resource.Sc
 				Attributes: map[string]schema.Attribute{
 					"url": schema.StringAttribute{
 						Required:      true,
-						Description:   "The URL to POST the notification payload to.",
+						Sensitive:     true,
+						Description:   "The URL to POST the notification payload to. Marked sensitive because webhook URLs frequently embed authentication tokens.",
 						PlanModifiers: requiresReplaceStr,
 					},
 				},
@@ -193,7 +194,8 @@ func (r *RepositoryNotificationResource) Schema(_ context.Context, _ resource.Sc
 				Attributes: map[string]schema.Attribute{
 					"url": schema.StringAttribute{
 						Required:      true,
-						Description:   "The Slack Incoming Webhook URL.",
+						Sensitive:     true,
+						Description:   "The Slack Incoming Webhook URL. Marked sensitive because the URL itself is the credential.",
 						PlanModifiers: requiresReplaceStr,
 					},
 				},
@@ -217,6 +219,7 @@ func (r *RepositoryNotificationResource) Schema(_ context.Context, _ resource.Sc
 				Attributes: map[string]schema.Attribute{
 					"notification_token": schema.StringAttribute{
 						Required:      true,
+						Sensitive:     true,
 						Description:   "The HipChat API notification token.",
 						PlanModifiers: requiresReplaceStr,
 					},
@@ -234,6 +237,7 @@ func (r *RepositoryNotificationResource) Schema(_ context.Context, _ resource.Sc
 				Attributes: map[string]schema.Attribute{
 					"flow_api_token": schema.StringAttribute{
 						Required:      true,
+						Sensitive:     true,
 						Description:   "The Flowdock flow API token.",
 						PlanModifiers: requiresReplaceStr,
 					},
