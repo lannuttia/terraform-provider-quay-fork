@@ -26,7 +26,6 @@ type OrganizationResourceModel struct {
 	ID                  types.String `tfsdk:"id"`
 	Name                types.String `tfsdk:"name"`
 	Email               types.String `tfsdk:"email"`
-	ContactEmail        types.String `tfsdk:"contact_email"`
 	InvoiceEmail        types.Bool   `tfsdk:"invoice_email"`
 	InvoiceEmailAddress types.String `tfsdk:"invoice_email_address"`
 	TagExpirationS      types.Int64  `tfsdk:"tag_expiration_s"`
@@ -62,14 +61,6 @@ func (r *OrganizationResource) Schema(_ context.Context, _ resource.SchemaReques
 				Optional:    true,
 				Computed:    true,
 				Description: "The contact email address for the organization.",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
-			},
-			"contact_email": schema.StringAttribute{
-				Optional:    true,
-				Computed:    true,
-				Description: "The secondary contact email address.",
 				PlanModifiers: []planmodifier.String{
 					stringplanmodifier.UseStateForUnknown(),
 				},
@@ -122,9 +113,8 @@ func (r *OrganizationResource) Create(ctx context.Context, req resource.CreateRe
 	}
 
 	org, err := r.client.CreateOrganization(ctx, client.CreateOrganizationRequest{
-		Name:         plan.Name.ValueString(),
-		Email:        plan.Email.ValueString(),
-		ContactEmail: plan.ContactEmail.ValueString(),
+		Name:  plan.Name.ValueString(),
+		Email: plan.Email.ValueString(),
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Error Creating Organization", err.Error())
@@ -136,7 +126,6 @@ func (r *OrganizationResource) Create(ctx context.Context, req resource.CreateRe
 	if needsUpdate {
 		updateReq := client.UpdateOrganizationRequest{
 			Email:               plan.Email.ValueString(),
-			ContactEmail:        plan.ContactEmail.ValueString(),
 			InvoiceEmail:        plan.InvoiceEmail.ValueBool(),
 			InvoiceEmailAddress: plan.InvoiceEmailAddress.ValueString(),
 			TagExpirationS:      int(plan.TagExpirationS.ValueInt64()),
@@ -182,7 +171,6 @@ func (r *OrganizationResource) Update(ctx context.Context, req resource.UpdateRe
 
 	org, err := r.client.UpdateOrganization(ctx, plan.Name.ValueString(), client.UpdateOrganizationRequest{
 		Email:               plan.Email.ValueString(),
-		ContactEmail:        plan.ContactEmail.ValueString(),
 		InvoiceEmail:        plan.InvoiceEmail.ValueBool(),
 		InvoiceEmailAddress: plan.InvoiceEmailAddress.ValueString(),
 		TagExpirationS:      int(plan.TagExpirationS.ValueInt64()),
@@ -245,7 +233,6 @@ func (r *OrganizationResource) mapToState(org *client.Organization, state *Organ
 	state.ID = types.StringValue(org.Name)
 	state.Name = types.StringValue(org.Name)
 	state.Email = types.StringValue(org.Email)
-	state.ContactEmail = types.StringValue(org.ContactEmail)
 	state.InvoiceEmail = types.BoolValue(org.InvoiceEmail)
 	state.InvoiceEmailAddress = types.StringValue(org.InvoiceEmailAddress)
 	state.TagExpirationS = types.Int64Value(int64(org.TagExpirationS))

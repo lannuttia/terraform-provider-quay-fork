@@ -9,7 +9,6 @@ import (
 type Organization struct {
 	Name                string `json:"name"`
 	Email               string `json:"email"`
-	ContactEmail        string `json:"contact_email,omitempty"`
 	InvoiceEmail        bool   `json:"invoice_email,omitempty"`
 	InvoiceEmailAddress string `json:"invoice_email_address,omitempty"`
 	TagExpirationS      int    `json:"tag_expiration_s,omitempty"`
@@ -18,14 +17,12 @@ type Organization struct {
 }
 
 type CreateOrganizationRequest struct {
-	Name         string `json:"name"`
-	Email        string `json:"email,omitempty"`
-	ContactEmail string `json:"contact_email,omitempty"`
+	Name  string `json:"name"`
+	Email string `json:"email,omitempty"`
 }
 
 type UpdateOrganizationRequest struct {
 	Email               string `json:"email,omitempty"`
-	ContactEmail        string `json:"contact_email,omitempty"`
 	InvoiceEmail        bool   `json:"invoice_email,omitempty"`
 	InvoiceEmailAddress string `json:"invoice_email_address,omitempty"`
 	TagExpirationS      int    `json:"tag_expiration_s,omitempty"`

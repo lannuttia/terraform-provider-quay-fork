@@ -52,7 +52,7 @@ resource "quay_organization" "test" {
 				ImportState:             true,
 				ImportStateId:           orgName,
 				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"tag_expiration_s", "invoice_email", "invoice_email_address", "contact_email"},
+				ImportStateVerifyIgnore: []string{"tag_expiration_s", "invoice_email", "invoice_email_address"},
 			},
 		},
 	})

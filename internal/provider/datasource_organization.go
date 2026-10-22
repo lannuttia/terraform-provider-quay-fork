@@ -19,7 +19,6 @@ type OrganizationDataSource struct {
 type OrganizationDataSourceModel struct {
 	Name                types.String `tfsdk:"name"`
 	Email               types.String `tfsdk:"email"`
-	ContactEmail        types.String `tfsdk:"contact_email"`
 	InvoiceEmail        types.Bool   `tfsdk:"invoice_email"`
 	InvoiceEmailAddress types.String `tfsdk:"invoice_email_address"`
 	TagExpirationS      types.Int64  `tfsdk:"tag_expiration_s"`
@@ -46,10 +45,6 @@ func (d *OrganizationDataSource) Schema(_ context.Context, _ datasource.SchemaRe
 			"email": schema.StringAttribute{
 				Computed:    true,
 				Description: "The contact email address for the organization.",
-			},
-			"contact_email": schema.StringAttribute{
-				Computed:    true,
-				Description: "The secondary contact email address.",
 			},
 			"invoice_email": schema.BoolAttribute{
 				Computed:    true,
@@ -102,7 +97,6 @@ func (d *OrganizationDataSource) Read(ctx context.Context, req datasource.ReadRe
 
 	state.Name = types.StringValue(org.Name)
 	state.Email = types.StringValue(org.Email)
-	state.ContactEmail = types.StringValue(org.ContactEmail)
 	state.InvoiceEmail = types.BoolValue(org.InvoiceEmail)
 	state.InvoiceEmailAddress = types.StringValue(org.InvoiceEmailAddress)
 	state.TagExpirationS = types.Int64Value(int64(org.TagExpirationS))

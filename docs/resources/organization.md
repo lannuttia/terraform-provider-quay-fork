@@ -28,7 +28,6 @@ resource "quay_organization" "example" {
 
 ### Optional
 
-- `contact_email` (String) The secondary contact email address.
 - `email` (String) The contact email address for the organization.
 - `invoice_email` (Boolean) Whether the organization receives invoice emails.
 - `invoice_email_address` (String) The email address to send invoices to.
