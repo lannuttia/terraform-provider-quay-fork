@@ -45,6 +45,22 @@ func TestCreateRepository(t *testing.T) {
 	}
 }
 
+func TestGetRepository_DoesNotFetchTags(t *testing.T) {
+	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.NotFound(w, r)
+			return
+		}
+		if got := r.URL.Query().Get("includeTags"); got != "false" {
+			t.Errorf("includeTags: want %q, got %q", "false", got)
+		}
+		writeJSON(w, http.StatusOK, client.Repository{Namespace: "myorg", Name: "myrepo"})
+	})
+	if _, err := c.GetRepository(context.Background(), "myorg/myrepo"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestGetRepository_NotFound(t *testing.T) {
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"message": "not found"})

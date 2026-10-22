@@ -52,7 +52,7 @@ func (c *Client) CreateRepository(ctx context.Context, req CreateRepositoryReque
 
 func (c *Client) GetRepository(ctx context.Context, repository string) (*Repository, error) {
 	var repo Repository
-	if err := c.get(ctx, fmt.Sprintf("repository/%s", repository), &repo); err != nil {
+	if err := c.get(ctx, fmt.Sprintf("repository/%s?includeTags=false", repository), &repo); err != nil {
 		return nil, fmt.Errorf("getting repository %q: %w", repository, err)
 	}
 	return &repo, nil
