@@ -172,6 +172,65 @@ resource "quay_repository" "test" {
 	})
 }
 
+// TestAccRepository_RemovingDescriptionClearsIt reproduces the bug raised by
+// jbpratt: removing the description attribute from config never clears it in
+// Quay. The UseStateForUnknown plan modifier on an Optional+Computed field
+// causes Terraform to copy the old state value into the plan when the
+// attribute is absent from config — so the provider never sends an update and
+// Quay keeps the old text.
+//
+// The fix is to drop UseStateForUnknown and use a Default of "" instead, so
+// that removing description from config sends an explicit empty string to the
+// API and clears the value.
+func TestAccRepository_RemovingDescriptionClearsIt(t *testing.T) {
+	skipIfNoAcc(t)
+	orgName := rname("tf-acc-desc-clear-org")
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: providerFactories(),
+		CheckDestroy: resource.ComposeTestCheckFunc(
+			checkOrganizationDestroyed(orgName),
+			checkRepositoryDestroyed(orgName+"/desc-repo"),
+		),
+		Steps: []resource.TestStep{
+			// Create with an explicit description.
+			{
+				Config: providerConfig() + fmt.Sprintf(`
+resource "quay_organization" "test" {
+  name  = %q
+  email = "desc-clear@example.com"
+}
+resource "quay_repository" "test" {
+  namespace   = quay_organization.test.name
+  name        = "desc-repo"
+  visibility  = "private"
+  description = "initial description"
+}
+`, orgName),
+				Check: resource.TestCheckResourceAttr("quay_repository.test", "description", "initial description"),
+			},
+			// Remove description from config entirely. With the bug present,
+			// UseStateForUnknown copies "initial description" into the plan so
+			// no update is sent and the value persists in state and in Quay.
+			// With the fix, the absence of description resolves to "" and an
+			// update is sent to clear it.
+			{
+				Config: providerConfig() + fmt.Sprintf(`
+resource "quay_organization" "test" {
+  name  = %q
+  email = "desc-clear@example.com"
+}
+resource "quay_repository" "test" {
+  namespace  = quay_organization.test.name
+  name       = "desc-repo"
+  visibility = "private"
+}
+`, orgName),
+				Check: resource.TestCheckResourceAttr("quay_repository.test", "description", ""),
+			},
+		},
+	})
+}
+
 func TestAccRepository_DeletedOutOfBand(t *testing.T) {
 	skipIfNoAcc(t)
 	orgName := rname("tf-acc-oob-repo-org")
