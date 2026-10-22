@@ -3,14 +3,14 @@ package provider
 import (
 	"context"
 	"fmt"
-	"strings"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/int32validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/resourcevalidator"
-	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int32planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -18,23 +18,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/lannuttia/terraform-provider-quay/internal/client"
 )
-
-// vulnerabilityLevelStrings returns the valid vulnerability level values as
-// plain strings, for use with stringvalidator.OneOf.
-func vulnerabilityLevelStrings() []string {
-	levels := client.VulnerabilityLevels()
-	out := make([]string, len(levels))
-	for i, l := range levels {
-		out[i] = string(l)
-	}
-	return out
-}
-
-// vulnerabilityLevelOneOfDescription returns a human-readable list of valid
-// vulnerability levels for use in schema descriptions.
-func vulnerabilityLevelOneOfDescription() string {
-	return strings.Join(vulnerabilityLevelStrings(), ", ") + "."
-}
 
 var _ resource.Resource = &RepositoryNotificationResource{}
 var _ resource.ResourceWithImportState = &RepositoryNotificationResource{}
@@ -113,7 +96,7 @@ type BuildEvent struct {
 }
 
 type VulnerabilityFoundEvent struct {
-	Level types.String `tfsdk:"level"`
+	Level types.Int32 `tfsdk:"level"`
 }
 
 type RepoMirrorSyncStartedEvent struct{}
@@ -309,11 +292,11 @@ func (r *RepositoryNotificationResource) Schema(_ context.Context, _ resource.Sc
 				Description:   "Trigger when a vulnerability is found. The required level attribute sets the minimum severity that triggers the notification.",
 				PlanModifiers: requiresReplaceObj,
 				Attributes: map[string]schema.Attribute{
-					"level": schema.StringAttribute{
+					"level": schema.Int32Attribute{
 						Required:      true,
-						Description:   "The minimum vulnerability severity level that triggers the notification. One of: " + vulnerabilityLevelOneOfDescription(),
-						Validators:    []validator.String{stringvalidator.OneOf(vulnerabilityLevelStrings()...)},
-						PlanModifiers: requiresReplaceStr,
+						Description:   "The minimum vulnerability severity level index that triggers the notification (0=Critical, 1=High, 2=Medium, 3=Low, 4=Negligible, 5=Unknown).",
+						Validators:    []validator.Int32{int32validator.Between(0, 5)},
+						PlanModifiers: []planmodifier.Int32{int32planmodifier.RequiresReplace()},
 					},
 				},
 			},
@@ -512,7 +495,7 @@ func (m *RepositoryNotificationResourceModel) eventAndConfig() (string, map[stri
 	case m.BuildCancelled != nil:
 		return "build_cancelled", buildRefRegexConfig(m.BuildCancelled.RefRegex)
 	case m.VulnerabilityFound != nil:
-		return "vulnerability_found", map[string]any{"level": client.VulnerabilityLevel(m.VulnerabilityFound.Level.ValueString())}
+		return "vulnerability_found", map[string]any{"level": m.VulnerabilityFound.Level.ValueInt32()}
 	case m.RepoMirrorSyncStarted != nil:
 		return "repo_mirror_sync_started", map[string]any{}
 	case m.RepoMirrorSyncSuccess != nil:
@@ -602,8 +585,9 @@ func (r *RepositoryNotificationResource) mapToState(notif *client.Notification, 
 	case "build_cancelled":
 		state.BuildCancelled = &BuildEvent{RefRegex: refRegexFromEventConfig(notif.EventConfig)}
 	case "vulnerability_found":
+		level, _ := notif.EventConfig.VulnerabilityLevelInt32()
 		state.VulnerabilityFound = &VulnerabilityFoundEvent{
-			Level: types.StringValue(string(notif.EventConfig.VulnerabilityLevel())),
+			Level: types.Int32Value(level),
 		}
 	case "repo_mirror_sync_started":
 		state.RepoMirrorSyncStarted = &RepoMirrorSyncStartedEvent{}

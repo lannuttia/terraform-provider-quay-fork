@@ -79,7 +79,10 @@ resource "quay_repository_notification" "bad" {
 	})
 }
 
-func TestAccRepositoryNotification_InvalidVulnerabilityLevel(t *testing.T) {
+// TestAccRepositoryNotification_VulnerabilityLevelStringRejected asserts that
+// passing a string (the old schema type) is now rejected, since level is an
+// Int64 that maps directly to the Quay API integer index.
+func TestAccRepositoryNotification_VulnerabilityLevelStringRejected(t *testing.T) {
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: providerFactories(),
 		Steps: []resource.TestStep{
@@ -88,10 +91,30 @@ func TestAccRepositoryNotification_InvalidVulnerabilityLevel(t *testing.T) {
 resource "quay_repository_notification" "bad" {
   repository          = "myorg/myrepo"
   webhook             = { url = "https://example.com" }
-  vulnerability_found = { level = "Catastrophic" }
+  vulnerability_found = { level = "High" }
 }
 `,
-				ExpectError: regexp.MustCompile(`(?i)(invalid|value must be one of)`),
+				ExpectError: regexp.MustCompile(`(?i)(inappropriate value|number|int)`),
+			},
+		},
+	})
+}
+
+// TestAccRepositoryNotification_VulnerabilityLevelOutOfRange asserts that an
+// integer outside the valid Quay index range (0–5) is rejected at plan time.
+func TestAccRepositoryNotification_VulnerabilityLevelOutOfRange(t *testing.T) {
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: providerFactories(),
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig() + `
+resource "quay_repository_notification" "bad" {
+  repository          = "myorg/myrepo"
+  webhook             = { url = "https://example.com" }
+  vulnerability_found = { level = 6 }
+}
+`,
+				ExpectError: regexp.MustCompile(`(?i)(between|must be at least|value must be)`),
 			},
 		},
 	})

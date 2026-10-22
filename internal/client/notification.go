@@ -5,34 +5,23 @@ import (
 	"fmt"
 )
 
-// VulnerabilityLevel is the minimum severity that triggers a vulnerability_found notification.
-type VulnerabilityLevel string
-
-const (
-	VulnerabilityLevelLow      VulnerabilityLevel = "Low"
-	VulnerabilityLevelMedium   VulnerabilityLevel = "Medium"
-	VulnerabilityLevelHigh     VulnerabilityLevel = "High"
-	VulnerabilityLevelCritical VulnerabilityLevel = "Critical"
-)
-
-// VulnerabilityLevels returns all valid VulnerabilityLevel values in ascending severity order.
-func VulnerabilityLevels() []VulnerabilityLevel {
-	return []VulnerabilityLevel{
-		VulnerabilityLevelLow,
-		VulnerabilityLevelMedium,
-		VulnerabilityLevelHigh,
-		VulnerabilityLevelCritical,
-	}
-}
-
 // EventConfig holds the event-specific configuration returned by the Quay API.
 type EventConfig map[string]any
 
-// VulnerabilityLevel extracts the vulnerability severity level from the event
-// config. Returns an empty string if the key is absent.
-func (e EventConfig) VulnerabilityLevel() VulnerabilityLevel {
-	v, _ := e["level"]
-	return VulnerabilityLevel(fmt.Sprintf("%v", v))
+// VulnerabilityLevelInt32 extracts the vulnerability severity level from the
+// event config as an int32. The Quay API stores the level as an integer index
+// (0=Critical, 1=High, 2=Medium, 3=Low, 4=Negligible, 5=Unknown). Returns
+// false if the key is absent or nil.
+func (e EventConfig) VulnerabilityLevelInt32() (int32, bool) {
+	v, ok := e["level"]
+	if !ok || v == nil {
+		return 0, false
+	}
+	// JSON numbers unmarshal as float64.
+	if f, ok := v.(float64); ok {
+		return int32(f), true
+	}
+	return 0, false
 }
 
 // Notification represents a Quay repository notification.
