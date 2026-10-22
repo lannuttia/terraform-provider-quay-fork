@@ -309,56 +309,11 @@ resource "quay_repository_notification" "test" {
 	})
 }
 
-func TestAccRepositoryNotification_generateConfig(t *testing.T) {
-	// GenerateConfig cannot produce valid HCL for quay_repository_notification
-	// because the method attributes (e.g. webhook.url, slack.url) are marked
-	// Sensitive: true. Terraform redacts sensitive values in generated config,
-	// leaving Required attributes absent and causing the subsequent plan to
-	// fail with "Missing Configuration for Required Attribute". This is a known
-	// Terraform framework limitation: generated config and sensitive+required
-	// attributes are fundamentally incompatible. Use the importCommand or
-	// importBlock tests to verify import behaviour instead.
-	t.Skip("GenerateConfig is incompatible with Sensitive+Required method attributes")
-	skipIfNoAcc(t)
-	orgName := rname("tf-acc-import-notif-gen")
-	cfg := providerConfig() + fmt.Sprintf(`
-resource "quay_organization" "test" {
-  name  = %q
-  email = "import@example.com"
-}
-resource "quay_repository" "test" {
-  namespace   = quay_organization.test.name
-  name        = "import-notif-repo"
-  visibility  = "private"
-  description = ""
-}
-resource "quay_repository_notification" "test" {
-  repository = quay_repository.test.id
-  title      = "import test"
-  webhook    = { url = "https://httpbin.org/post" }
-  repo_push  = {}
-}
-`, orgName)
-	resource.Test(t, resource.TestCase{
-		ProtoV6ProviderFactories: providerFactories(),
-		CheckDestroy: resource.ComposeTestCheckFunc(
-			checkOrganizationDestroyed(orgName),
-			checkRepositoryDestroyed(orgName+"/import-notif-repo"),
-			checkNotificationDestroyed("quay_repository_notification.test"),
-		),
-		Steps: []resource.TestStep{
-			{Config: cfg},
-			{
-				Config:            cfg,
-				ResourceName:      "quay_repository_notification.test",
-				ImportState:       true,
-				ImportStateKind:   resource.ImportBlockWithID,
-				GenerateConfig:    true,
-				ImportStateIdFunc: notificationImportID("quay_repository_notification.test"),
-			},
-		},
-	})
-}
+// TestAccRepositoryNotification_generateConfig is intentionally absent.
+// Terraform's GenerateConfig redacts Sensitive: true attributes, so the
+// generated HCL is missing Required fields such as webhook.url and slack.url,
+// causing the subsequent plan to fail. The importCommand and importBlock tests
+// above cover import behaviour without this constraint.
 
 // ---------------------------------------------------------------------------
 // Import error cases
