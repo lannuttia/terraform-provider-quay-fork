@@ -450,8 +450,16 @@ func (r *RepositoryNotificationResource) Read(ctx context.Context, req resource.
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
-func (r *RepositoryNotificationResource) Update(_ context.Context, _ resource.UpdateRequest, _ *resource.UpdateResponse) {
-	// All meaningful fields use RequiresReplace — update is never called.
+func (r *RepositoryNotificationResource) Update(_ context.Context, _ resource.UpdateRequest, resp *resource.UpdateResponse) {
+	// All attributes on this resource carry RequiresReplace, so the Terraform
+	// framework should never invoke Update. If it does, that is a bug in the
+	// provider schema.
+	resp.Diagnostics.AddError(
+		"Unexpected Update",
+		"The quay_repository_notification resource does not support in-place updates. "+
+			"This is a bug in the provider — please report it at "+
+			"https://github.com/quay/terraform-provider-quay/issues.",
+	)
 }
 
 func (r *RepositoryNotificationResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
