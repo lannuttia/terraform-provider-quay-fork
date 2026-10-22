@@ -13,7 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/provider/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/lannuttia/terraform-provider-quay/internal/client"
+	"github.com/quay/terraform-provider-quay/internal/client"
 )
 
 var _ provider.Provider = &QuayProvider{}

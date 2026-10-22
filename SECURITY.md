@@ -14,7 +14,7 @@ Only the latest released version of this provider receives security fixes.
 **Please do not report security vulnerabilities through public GitHub issues.**
 
 To report a vulnerability, use GitHub's private
-[Security Advisory](https://github.com/lannuttia/terraform-provider-quay/security/advisories/new)
+[Security Advisory](https://github.com/quay/terraform-provider-quay/security/advisories/new)
 feature. This allows us to discuss, fix, and disclose the issue responsibly.
 
 Please include as much of the following information as possible to help us

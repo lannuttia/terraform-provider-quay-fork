@@ -1,4 +1,4 @@
-module github.com/lannuttia/terraform-provider-quay
+module github.com/quay/terraform-provider-quay
 
 go 1.27.2
 

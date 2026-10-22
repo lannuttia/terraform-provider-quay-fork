@@ -6,7 +6,7 @@ import (
 
 	fwresource "github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	provider "github.com/lannuttia/terraform-provider-quay/internal/provider"
+	provider "github.com/quay/terraform-provider-quay/internal/provider"
 )
 
 // schemaFor returns the schema of a resource produced by the given factory.

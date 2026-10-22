@@ -7,7 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/lannuttia/terraform-provider-quay/internal/client"
+	"github.com/quay/terraform-provider-quay/internal/client"
 )
 
 var _ datasource.DataSource = &RepositoryDataSource{}

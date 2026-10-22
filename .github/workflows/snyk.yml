@@ -26,6 +26,6 @@ jobs:
         uses: snyk/actions/setup@11b673cfb4b0dc0d860a1323caa199d54950dcce
 
       - name: Run Snyk monitor
-        run: snyk monitor --org=lannuttia --project-name=github.com/lannuttia/terraform-provider-quay
+        run: snyk monitor --org=quay --project-name=github.com/quay/terraform-provider-quay
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}

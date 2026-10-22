@@ -27,7 +27,7 @@ credentials in your configuration files.
 terraform {
   required_providers {
     quay = {
-      source  = "lannuttia/quay"
+      source  = "quay/quay"
       version = "~> 0.2"
     }
   }

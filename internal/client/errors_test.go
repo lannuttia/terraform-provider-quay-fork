@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/lannuttia/terraform-provider-quay/internal/client"
+	"github.com/quay/terraform-provider-quay/internal/client"
 )
 
 // ----- HTTP error status codes --------------------------------------------

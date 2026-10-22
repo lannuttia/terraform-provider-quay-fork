@@ -11,8 +11,8 @@ import (
 	"github.com/hashicorp/terraform-plugin-go/tfprotov6"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
-	"github.com/lannuttia/terraform-provider-quay/internal/client"
-	"github.com/lannuttia/terraform-provider-quay/internal/provider"
+	"github.com/quay/terraform-provider-quay/internal/client"
+	"github.com/quay/terraform-provider-quay/internal/provider"
 )
 
 // testState holds the running Quay instance URL and token, shared across all

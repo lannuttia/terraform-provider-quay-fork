@@ -4,17 +4,17 @@ A Terraform provider for managing resources on [Quay.io](https://quay.io) or a
 self-hosted [Red Hat Quay](https://www.redhat.com/en/technologies/cloud-computing/quay)
 instance.
 
-[![Build](https://github.com/lannuttia/terraform-provider-quay/actions/workflows/ci.yml/badge.svg)](https://github.com/lannuttia/terraform-provider-quay/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/release/lannuttia/terraform-provider-quay.svg?style=flat)](https://github.com/lannuttia/terraform-provider-quay/releases/latest)
-[![Repository](https://img.shields.io/badge/github-repo-blue?logo=github)](https://github.com/lannuttia/terraform-provider-quay)
-[![Registry](https://img.shields.io/badge/Terraform%20Registry-lannuttia%2Fquay-623CE4)](https://registry.terraform.io/providers/lannuttia/quay/latest)
-![Known Vulnerabilities](https://snyk.io/test/github/lannuttia/terraform-provider-quay/badge.svg)
+[![Build](https://github.com/quay/terraform-provider-quay/actions/workflows/ci.yml/badge.svg)](https://github.com/quay/terraform-provider-quay/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/release/quay/terraform-provider-quay.svg?style=flat)](https://github.com/quay/terraform-provider-quay/releases/latest)
+[![Repository](https://img.shields.io/badge/github-repo-blue?logo=github)](https://github.com/quay/terraform-provider-quay)
+[![Registry](https://img.shields.io/badge/Terraform%20Registry-quay%2Fquay-623CE4)](https://registry.terraform.io/providers/quay/quay/latest)
+![Known Vulnerabilities](https://snyk.io/test/github/quay/terraform-provider-quay/badge.svg)
 [![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow.svg?style=flat)](https://conventionalcommits.org)
 
 ## Documentation
 
 Full provider documentation, including argument references and import examples,
-is available on the [Terraform Registry](https://registry.terraform.io/providers/lannuttia/quay/latest/docs).
+is available on the [Terraform Registry](https://registry.terraform.io/providers/quay/quay/latest/docs).
 
 ## Requirements
 
@@ -27,7 +27,7 @@ is available on the [Terraform Registry](https://registry.terraform.io/providers
 terraform {
   required_providers {
     quay = {
-      source  = "lannuttia/quay"
+      source  = "quay/quay"
       version = "~> 0.2"
     }
   }
@@ -47,16 +47,16 @@ provider "quay" {
 
 | Resource | Description |
 |---|---|
-| [`quay_organization`](https://registry.terraform.io/providers/lannuttia/quay/latest/docs/resources/organization) | Manages a Quay organization |
-| [`quay_repository`](https://registry.terraform.io/providers/lannuttia/quay/latest/docs/resources/repository) | Manages a Quay repository |
-| [`quay_repository_notification`](https://registry.terraform.io/providers/lannuttia/quay/latest/docs/resources/repository_notification) | Manages a notification on a repository |
+| [`quay_organization`](https://registry.terraform.io/providers/quay/quay/latest/docs/resources/organization) | Manages a Quay organization |
+| [`quay_repository`](https://registry.terraform.io/providers/quay/quay/latest/docs/resources/repository) | Manages a Quay repository |
+| [`quay_repository_notification`](https://registry.terraform.io/providers/quay/quay/latest/docs/resources/repository_notification) | Manages a notification on a repository |
 
 ## Supported Data Sources
 
 | Data Source | Description |
 |---|---|
-| [`quay_organization`](https://registry.terraform.io/providers/lannuttia/quay/latest/docs/data-sources/organization) | Reads information about a Quay organization |
-| [`quay_repository`](https://registry.terraform.io/providers/lannuttia/quay/latest/docs/data-sources/repository) | Reads information about a Quay repository |
+| [`quay_organization`](https://registry.terraform.io/providers/quay/quay/latest/docs/data-sources/organization) | Reads information about a Quay organization |
+| [`quay_repository`](https://registry.terraform.io/providers/quay/quay/latest/docs/data-sources/repository) | Reads information about a Quay repository |
 
 ---
 

@@ -16,7 +16,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
-	"github.com/lannuttia/terraform-provider-quay/internal/client"
+	"github.com/quay/terraform-provider-quay/internal/client"
 )
 
 var _ resource.Resource = &RepositoryNotificationResource{}

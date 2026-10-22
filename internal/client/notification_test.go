@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lannuttia/terraform-provider-quay/internal/client"
+	"github.com/quay/terraform-provider-quay/internal/client"
 )
 
 func TestCreateRepoNotification(t *testing.T) {

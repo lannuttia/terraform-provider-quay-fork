@@ -1,5 +1,5 @@
 HOSTNAME    = registry.terraform.io
-NAMESPACE   = lannuttia
+NAMESPACE   = quay
 NAME        = quay
 BINARY      = terraform-provider-$(NAME)
 VERSION     ?= $(shell git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || echo "0.0.0-dev")

@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lannuttia/terraform-provider-quay/internal/client"
+	"github.com/quay/terraform-provider-quay/internal/client"
 )
 
 // newTestServer starts an httptest server. The handler receives the full request
