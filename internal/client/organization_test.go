@@ -2,6 +2,8 @@ package client_test
 
 import (
 	"context"
+	"encoding/json"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -90,5 +92,71 @@ func TestDeleteOrganization(t *testing.T) {
 	}
 	if !deleted {
 		t.Error("DELETE was never called")
+	}
+}
+
+// TestUpdateOrganization_InvoiceEmailFalse ensures that false is included in
+// the PUT request body when invoice_email is set to false. Previously omitempty
+// on the bool field caused false to be silently dropped, so Quay kept the old
+// value instead of disabling invoice emails.
+func TestUpdateOrganization_InvoiceEmailFalse(t *testing.T) {
+	var gotBody map[string]any
+	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPut:
+			b, _ := io.ReadAll(r.Body)
+			_ = json.Unmarshal(b, &gotBody)
+			writeJSON(w, http.StatusOK, map[string]string{})
+		case http.MethodGet:
+			writeJSON(w, http.StatusOK, client.Organization{Name: "myorg", InvoiceEmail: false})
+		}
+	})
+
+	_, err := c.UpdateOrganization(context.Background(), "myorg", client.UpdateOrganizationRequest{
+		InvoiceEmail: false,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	v, exists := gotBody["invoice_email"]
+	if !exists {
+		t.Fatal("invoice_email was missing from the PUT request body")
+	}
+	if v != false {
+		t.Errorf("expected invoice_email=false in request body, got %v", v)
+	}
+}
+
+// TestUpdateOrganization_TagExpirationZero ensures that 0 is included in the
+// PUT request body when tag_expiration_s is set to 0. Previously omitempty on
+// the int field caused 0 to be silently dropped, preventing users from
+// clearing the tag expiration.
+func TestUpdateOrganization_TagExpirationZero(t *testing.T) {
+	var gotBody map[string]any
+	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPut:
+			b, _ := io.ReadAll(r.Body)
+			_ = json.Unmarshal(b, &gotBody)
+			writeJSON(w, http.StatusOK, map[string]string{})
+		case http.MethodGet:
+			writeJSON(w, http.StatusOK, client.Organization{Name: "myorg", TagExpirationS: 0})
+		}
+	})
+
+	_, err := c.UpdateOrganization(context.Background(), "myorg", client.UpdateOrganizationRequest{
+		TagExpirationS: 0,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	v, exists := gotBody["tag_expiration_s"]
+	if !exists {
+		t.Fatal("tag_expiration_s was missing from the PUT request body")
+	}
+	if v != float64(0) {
+		t.Errorf("expected tag_expiration_s=0 in request body, got %v", v)
 	}
 }

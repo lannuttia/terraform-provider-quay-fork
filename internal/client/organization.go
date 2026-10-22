@@ -23,9 +23,9 @@ type CreateOrganizationRequest struct {
 
 type UpdateOrganizationRequest struct {
 	Email               string `json:"email,omitempty"`
-	InvoiceEmail        bool   `json:"invoice_email,omitempty"`
+	InvoiceEmail        bool   `json:"invoice_email"`
 	InvoiceEmailAddress string `json:"invoice_email_address,omitempty"`
-	TagExpirationS      int    `json:"tag_expiration_s,omitempty"`
+	TagExpirationS      int    `json:"tag_expiration_s"`
 }
 
 func (c *Client) CreateOrganization(ctx context.Context, req CreateOrganizationRequest) (*Organization, error) {
