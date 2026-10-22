@@ -155,6 +155,17 @@ func (r *RepositoryResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
+	// Save state after the description update so that if the visibility change
+	// below fails, the description change is still recorded. Without this, a
+	// failed ChangeRepositoryVisibility call causes the description update
+	// (which already succeeded) to be invisible to Terraform — every subsequent
+	// plan then sees drift and re-applies the description change.
+	r.mapToState(repo, &plan)
+	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	// Change visibility if it differs
 	if plan.Visibility.ValueString() != state.Visibility.ValueString() {
 		if err := r.client.ChangeRepositoryVisibility(ctx, repoPath, client.ChangeVisibilityRequest{
@@ -164,10 +175,9 @@ func (r *RepositoryResource) Update(ctx context.Context, req resource.UpdateRequ
 			return
 		}
 		repo.IsPublic = plan.Visibility.ValueString() == client.VisibilityPublic
+		r.mapToState(repo, &plan)
+		resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	}
-
-	r.mapToState(repo, &plan)
-	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 }
 
 func (r *RepositoryResource) Delete(ctx context.Context, req resource.DeleteRequest, resp *resource.DeleteResponse) {
