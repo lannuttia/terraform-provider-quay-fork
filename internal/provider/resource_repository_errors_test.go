@@ -118,6 +118,60 @@ resource "quay_repository" "test" {
 	})
 }
 
+// TestAccRepository_OrgDeletedOutOfBandRemovesRepoFromState reproduces the bug
+// raised by jbpratt: when a parent organization is deleted out-of-band, Quay
+// returns 403 (not 404) for any GET on a repository in that namespace. Because
+// Read only treated 404 as "gone", a 403 caused a plan error instead of
+// removing the resource from state, leaving it permanently stuck.
+//
+// The fix is: on a 403, check whether the namespace itself still exists. If it
+// is also gone, treat the repository as gone and remove it from state. If the
+// namespace exists, the 403 is a genuine permission error and should surface.
+func TestAccRepository_OrgDeletedOutOfBandRemovesRepoFromState(t *testing.T) {
+	skipIfNoAcc(t)
+	orgName := rname("tf-acc-oob-org-del")
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: providerFactories(),
+		Steps: []resource.TestStep{
+			// Create the org and a repo managed by Terraform.
+			{
+				Config: providerConfig() + fmt.Sprintf(`
+resource "quay_organization" "test" {
+  name  = %q
+  email = "oob-org-del@example.com"
+}
+resource "quay_repository" "test" {
+  namespace   = quay_organization.test.name
+  name        = "oob-repo"
+  visibility  = "private"
+  description = ""
+}
+`, orgName),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("quay_repository.test", "name", "oob-repo"),
+				),
+			},
+			// Delete the entire organization out-of-band. The next refresh will
+			// call Read on the repository. Quay returns 403 for a repo in a
+			// deleted namespace. With the bug present, Read surfaces this as an
+			// error and the plan is stuck. With the fix, Read detects the
+			// namespace is gone and removes the resource from state, so the
+			// refresh produces an empty plan.
+			{
+				PreConfig: func() {
+					c := quayClient()
+					ctx := t.Context()
+					if err := c.DeleteOrganization(ctx, orgName); err != nil {
+						t.Fatalf("deleting organization out-of-band: %v", err)
+					}
+				},
+				RefreshState:       true,
+				ExpectNonEmptyPlan: true,
+			},
+		},
+	})
+}
+
 func TestAccRepository_DeletedOutOfBand(t *testing.T) {
 	skipIfNoAcc(t)
 	orgName := rname("tf-acc-oob-repo-org")

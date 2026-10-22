@@ -128,6 +128,18 @@ func (r *RepositoryResource) Read(ctx context.Context, req resource.ReadRequest,
 			resp.State.RemoveResource(ctx)
 			return
 		}
+		// Quay returns 403 when the repository's namespace has been deleted
+		// out-of-band (the org no longer exists). Check whether the namespace
+		// itself is gone before surfacing the error — if it is, the repository
+		// is also gone and we remove it from state. If the namespace still
+		// exists, the 403 is a genuine permission error and should be reported.
+		if client.IsForbidden(err) {
+			_, nsErr := r.client.GetOrganization(ctx, state.Namespace.ValueString())
+			if client.IsNotFound(nsErr) {
+				resp.State.RemoveResource(ctx)
+				return
+			}
+		}
 		resp.Diagnostics.AddError("Error Reading Repository", err.Error())
 		return
 	}
