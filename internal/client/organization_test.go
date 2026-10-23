@@ -270,3 +270,47 @@ func TestUpdateOrganization_TagExpirationZero(t *testing.T) {
 		t.Errorf("expected tag_expiration_s=0 in request body, got %v", v)
 	}
 }
+
+// TestCreateOrganization_GetFailsAfterPost simulates a transient failure on
+// the follow-up GET that CreateOrganization issues after a successful POST.
+// The Quay POST /organization/ endpoint returns an empty 201 body, so the GET
+// is unavoidable. However, when the GET fails the error must make it clear
+// that the organization was already created — otherwise operators will re-run
+// apply, hit a 409 conflict, and be left with an orphaned resource and no
+// Terraform state entry.
+func TestCreateOrganization_GetFailsAfterPost(t *testing.T) {
+	postCalled := false
+	getCalled := false
+	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/organization/"):
+			postCalled = true
+			writeJSON(w, http.StatusCreated, map[string]string{})
+		case r.Method == http.MethodGet:
+			getCalled = true
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"message": "unavailable"})
+		default:
+			http.NotFound(w, r)
+		}
+	})
+
+	_, err := c.CreateOrganization(context.Background(), client.CreateOrganizationRequest{
+		Name:  "myorg",
+		Email: "a@b.com",
+	})
+
+	if !postCalled {
+		t.Fatal("POST /organization/ was never called")
+	}
+	if !getCalled {
+		t.Fatal("GET /organization/myorg was never called")
+	}
+	if err == nil {
+		t.Fatal("expected error when GET fails after POST, got nil")
+	}
+	// The error message must warn the operator that the organization was
+	// already created, so they know not to re-run apply without checking.
+	if !strings.Contains(err.Error(), "already created") {
+		t.Errorf("error should mention that the org was already created; got: %v", err)
+	}
+}

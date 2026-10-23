@@ -47,7 +47,7 @@ func (c *Client) CreateRepository(ctx context.Context, req CreateRepositoryReque
 	if err := c.post(ctx, "repository", req, &repo); err != nil {
 		return nil, fmt.Errorf("creating repository %q: %w", req.Repository, err)
 	}
-	return c.GetRepository(ctx, fmt.Sprintf("%s/%s", req.Namespace, req.Repository))
+	return &repo, nil
 }
 
 func (c *Client) GetRepository(ctx context.Context, repository string) (*Repository, error) {
