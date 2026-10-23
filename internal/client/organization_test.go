@@ -128,6 +128,76 @@ func TestUpdateOrganization_InvoiceEmailFalse(t *testing.T) {
 	}
 }
 
+// TestUpdateOrganization_EmailEmpty ensures that an empty string is included in
+// the PUT request body when email is explicitly set to "". The Quay API treats
+// an empty email as a request to clear the field (it stores a random UUID
+// internally and returns "" on subsequent GETs). With omitempty on the field
+// the empty string is silently dropped, making it impossible to clear the email
+// through the provider.
+func TestUpdateOrganization_EmailEmpty(t *testing.T) {
+	var gotBody map[string]any
+	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPut:
+			b, _ := io.ReadAll(r.Body)
+			_ = json.Unmarshal(b, &gotBody)
+			writeJSON(w, http.StatusOK, map[string]string{})
+		case http.MethodGet:
+			writeJSON(w, http.StatusOK, client.Organization{Name: "myorg", Email: ""})
+		}
+	})
+
+	_, err := c.UpdateOrganization(context.Background(), "myorg", client.UpdateOrganizationRequest{
+		Email: "",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	v, exists := gotBody["email"]
+	if !exists {
+		t.Fatal("email was missing from the PUT request body; omitempty prevents clearing the field")
+	}
+	if v != "" {
+		t.Errorf("expected email=\"\" in request body, got %v", v)
+	}
+}
+
+// TestUpdateOrganization_InvoiceEmailAddressEmpty ensures that an empty string
+// is included in the PUT request body when invoice_email_address is explicitly
+// set to "". The Quay API schema marks this field as nullable (type:
+// ["string","null"]), so sending "" clears it. With omitempty on the field the
+// empty string is silently dropped, making it impossible to clear the address
+// through the provider.
+func TestUpdateOrganization_InvoiceEmailAddressEmpty(t *testing.T) {
+	var gotBody map[string]any
+	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPut:
+			b, _ := io.ReadAll(r.Body)
+			_ = json.Unmarshal(b, &gotBody)
+			writeJSON(w, http.StatusOK, map[string]string{})
+		case http.MethodGet:
+			writeJSON(w, http.StatusOK, client.Organization{Name: "myorg", InvoiceEmailAddress: ""})
+		}
+	})
+
+	_, err := c.UpdateOrganization(context.Background(), "myorg", client.UpdateOrganizationRequest{
+		InvoiceEmailAddress: "",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	v, exists := gotBody["invoice_email_address"]
+	if !exists {
+		t.Fatal("invoice_email_address was missing from the PUT request body; omitempty prevents clearing the field")
+	}
+	if v != "" {
+		t.Errorf("expected invoice_email_address=\"\" in request body, got %v", v)
+	}
+}
+
 // TestUpdateOrganization_TagExpirationZero ensures that 0 is included in the
 // PUT request body when tag_expiration_s is set to 0. Previously omitempty on
 // the int field caused 0 to be silently dropped, preventing users from

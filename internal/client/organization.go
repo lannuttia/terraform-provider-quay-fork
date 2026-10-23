@@ -22,9 +22,9 @@ type CreateOrganizationRequest struct {
 }
 
 type UpdateOrganizationRequest struct {
-	Email               string `json:"email,omitempty"`
+	Email               string `json:"email"`
 	InvoiceEmail        bool   `json:"invoice_email"`
-	InvoiceEmailAddress string `json:"invoice_email_address,omitempty"`
+	InvoiceEmailAddress string `json:"invoice_email_address"`
 	TagExpirationS      int    `json:"tag_expiration_s"`
 }
 
