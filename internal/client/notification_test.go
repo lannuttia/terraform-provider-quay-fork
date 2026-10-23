@@ -13,15 +13,19 @@ import (
 func TestCreateRepoNotification(t *testing.T) {
 	created := false
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost && strings.Contains(r.URL.Path, "/notification/") {
+		notif := client.Notification{
+			UUID:        "abc-123",
+			Event:       "repo_push",
+			Method:      "webhook",
+			Config:      map[string]any{"url": "https://example.com"},
+			EventConfig: map[string]any{},
+		}
+		switch {
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/notification/"):
 			created = true
-			writeJSON(w, http.StatusCreated, client.Notification{
-				UUID:        "abc-123",
-				Event:       "repo_push",
-				Method:      "webhook",
-				Config:      map[string]any{"url": "https://example.com"},
-				EventConfig: map[string]any{},
-			})
+			writeJSON(w, http.StatusCreated, notif)
+		case r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/notification/abc-123"):
+			writeJSON(w, http.StatusOK, notif)
 		}
 	})
 
