@@ -174,18 +174,18 @@ Every new resource or data source should have:
 
 ### CI pipeline
 
-The CI pipeline uses a hybrid approach:
+| Job | Tooling |
+|---|---|
+| Schema validation | `pipx run pre-commit` |
+| Build, lint | `actions/setup-go` + `golangci/golangci-lint-action` |
+| Docs drift | `actions/setup-go` + `hashicorp/setup-terraform` |
+| Unit tests | `actions/setup-go` |
+| Acceptance tests | `actions/setup-go` + `hashicorp/setup-terraform` (matrix of Terraform CLI versions) |
+| Release | `actions/setup-go` + `goreleaser/goreleaser-action` |
 
-| Job | Tooling | Reason |
-|---|---|---|
-| Build, lint | Nix dev shell | Exact same Go and golangci-lint versions as local dev |
-| Unit tests | Nix dev shell | Consistent Go version |
-| Acceptance tests | `actions/setup-go` + `hashicorp/setup-terraform` | Tests a matrix of Terraform CLI versions the flake doesn't model |
-| Release | `actions/setup-go` + `goreleaser-action` | GPG signing handled separately; unchanged |
-
-The Nix jobs use `DeterminateSystems/nix-installer-action` and
-`DeterminateSystems/magic-nix-cache-action` to install Nix and share the
-binary cache across runs, keeping cold-start overhead low.
+All CI jobs use `actions/setup-go` pinned to the version declared in `go.mod`.
+The Nix dev shell is available locally (see [Option A](#option-a--nix-recommended)
+above) but is not used in CI.
 
 ---
 
