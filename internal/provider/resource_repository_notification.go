@@ -26,10 +26,6 @@ type RepositoryNotificationResource struct {
 	client *client.Client
 }
 
-// -------------------------------------------------------------------------
-// Terraform state model
-// -------------------------------------------------------------------------
-
 type RepositoryNotificationResourceModel struct {
 	ID               types.String `tfsdk:"id"`
 	Repository       types.String `tfsdk:"repository"`
@@ -37,7 +33,6 @@ type RepositoryNotificationResourceModel struct {
 	Title            types.String `tfsdk:"title"`
 	NumberOfFailures types.Int64  `tfsdk:"number_of_failures"`
 
-	// Exactly one method block must be set.
 	Webhook          *WebhookConfig          `tfsdk:"webhook"`
 	Slack            *SlackConfig            `tfsdk:"slack"`
 	Email            *EmailConfig            `tfsdk:"email"`
@@ -45,8 +40,6 @@ type RepositoryNotificationResourceModel struct {
 	Flowdock         *FlowdockConfig         `tfsdk:"flowdock"`
 	QuayNotification *QuayNotificationConfig `tfsdk:"quay_notification"`
 
-	// Exactly one event block must be set. Event-specific config lives inside
-	// each block, making invalid combinations structurally impossible.
 	RepoPush              *RepoPushEvent              `tfsdk:"repo_push"`
 	BuildQueued           *BuildEvent                 `tfsdk:"build_queued"`
 	BuildStart            *BuildEvent                 `tfsdk:"build_start"`
@@ -58,8 +51,6 @@ type RepositoryNotificationResourceModel struct {
 	RepoMirrorSyncSuccess *RepoMirrorSyncSuccessEvent `tfsdk:"repo_mirror_sync_success"`
 	RepoMirrorSyncFailed  *RepoMirrorSyncFailedEvent  `tfsdk:"repo_mirror_sync_failed"`
 }
-
-// Method config types
 
 type WebhookConfig struct {
 	URL types.String `tfsdk:"url"`
@@ -94,10 +85,6 @@ type QuayNotificationConfig struct {
 	Target QuayNotificationTarget `tfsdk:"target"`
 }
 
-// Event types
-// Events with no configuration use an empty struct so the block is still
-// present in the schema and self-documents that no options exist.
-
 type RepoPushEvent struct{}
 
 type BuildEvent struct {
@@ -112,10 +99,6 @@ type RepoMirrorSyncStartedEvent struct{}
 type RepoMirrorSyncSuccessEvent struct{}
 type RepoMirrorSyncFailedEvent struct{}
 
-// -------------------------------------------------------------------------
-// Constructor / metadata
-// -------------------------------------------------------------------------
-
 func NewRepositoryNotificationResource() resource.Resource {
 	return &RepositoryNotificationResource{}
 }
@@ -123,10 +106,6 @@ func NewRepositoryNotificationResource() resource.Resource {
 func (r *RepositoryNotificationResource) Metadata(_ context.Context, req resource.MetadataRequest, resp *resource.MetadataResponse) {
 	resp.TypeName = req.ProviderTypeName + "_repository_notification"
 }
-
-// -------------------------------------------------------------------------
-// Schema
-// -------------------------------------------------------------------------
 
 // buildEventAttributes returns the shared attribute set for all build event blocks.
 func buildEventAttributes(requiresReplace []planmodifier.String) map[string]schema.Attribute {
@@ -180,8 +159,6 @@ func (r *RepositoryNotificationResource) Schema(_ context.Context, _ resource.Sc
 				Computed:    true,
 				Description: "The number of consecutive delivery failures.",
 			},
-
-			// ----- method blocks -----
 
 			"webhook": schema.SingleNestedAttribute{
 				Optional:      true,
@@ -279,11 +256,6 @@ func (r *RepositoryNotificationResource) Schema(_ context.Context, _ resource.Sc
 					},
 				},
 			},
-
-			// ----- event blocks -----
-			// Exactly one must be set (enforced by ConfigValidators).
-			// Event-specific config is nested inside the relevant block,
-			// making it impossible to supply config for the wrong event type.
 
 			"repo_push": schema.SingleNestedAttribute{
 				Optional:      true,
@@ -387,10 +359,6 @@ func (r *RepositoryNotificationResource) ConfigValidators(_ context.Context) []r
 		),
 	}
 }
-
-// -------------------------------------------------------------------------
-// CRUD
-// -------------------------------------------------------------------------
 
 func (r *RepositoryNotificationResource) Configure(_ context.Context, req resource.ConfigureRequest, resp *resource.ConfigureResponse) {
 	if req.ProviderData == nil {
@@ -500,10 +468,6 @@ func (r *RepositoryNotificationResource) ImportState(ctx context.Context, req re
 	})
 }
 
-// -------------------------------------------------------------------------
-// Mapping helpers
-// -------------------------------------------------------------------------
-
 // methodAndConfig derives the API method string and config map from whichever
 // method block is set in the plan.
 func (m *RepositoryNotificationResourceModel) methodAndConfig() (string, map[string]any) {
@@ -585,7 +549,6 @@ func (r *RepositoryNotificationResource) mapToState(notif *client.Notification, 
 	state.NumberOfFailures = types.Int64Value(int64(notif.NumberOfFailures))
 	state.ID = types.StringValue(fmt.Sprintf("%s/%s", repository, notif.UUID))
 
-	// Clear all method blocks, then populate only the one that matches.
 	state.Webhook = nil
 	state.Slack = nil
 	state.Email = nil
@@ -628,7 +591,6 @@ func (r *RepositoryNotificationResource) mapToState(notif *client.Notification, 
 		return diags
 	}
 
-	// Clear all event blocks, then populate only the one that matches.
 	state.RepoPush = nil
 	state.BuildQueued = nil
 	state.BuildStart = nil

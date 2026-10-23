@@ -47,9 +47,7 @@ func (c *Client) CreateRepository(ctx context.Context, req CreateRepositoryReque
 	if err := c.post(ctx, "repository", req, &repo); err != nil {
 		return nil, fmt.Errorf("creating repository %q: %w", req.Repository, err)
 	}
-	// The Quay POST /repository endpoint returns the created repository object
-	// but omits description from the response body even when one was supplied.
-	// Populate it from the request so state is consistent without a second GET.
+	// Quay omits description from the POST response; backfill from the request.
 	if repo.Description == "" && req.Description != "" {
 		repo.Description = req.Description
 	}
@@ -104,8 +102,6 @@ type tagListResponse struct {
 // HasRepositoryTags reports whether the repository has at least one active tag.
 // It returns (false, nil) when the repository does not exist (404).
 func (c *Client) HasRepositoryTags(ctx context.Context, repository string) (bool, error) {
-	// Build the path and append the raw query string ourselves so that the
-	// question mark is not percent-encoded by url.JoinPath.
 	path := fmt.Sprintf("repository/%s/tag/?onlyActiveTags=true&limit=1", repository)
 	var resp tagListResponse
 	if err := c.get(ctx, path, &resp); err != nil {
@@ -125,7 +121,6 @@ type repoListResponse struct {
 // HasOrganizationRepositories reports whether the organization namespace
 // contains at least one repository.
 func (c *Client) HasOrganizationRepositories(ctx context.Context, name string) (bool, error) {
-	// Append the raw query string ourselves so the ? is not escaped.
 	path := fmt.Sprintf("repository?namespace=%s", url.QueryEscape(name))
 	var resp repoListResponse
 	if err := c.get(ctx, path, &resp); err != nil {

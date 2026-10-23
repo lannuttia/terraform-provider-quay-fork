@@ -8,22 +8,19 @@ import (
 // EventConfig holds the event-specific configuration returned by the Quay API.
 type EventConfig map[string]any
 
-// vulnerabilityLevels maps the canonical Quay severity name (as shown in the
-// UI and used by PRIORITY_LEVELS in util/secscan/__init__.py) to the integer
-// index stored in the API's event_config.level field.
+// vulnerabilityLevels maps the Quay severity name to its API integer index.
+// Order is significant: position == index.
 var vulnerabilityLevels = []string{
-	"Critical",   // index 0
-	"High",       // index 1
-	"Medium",     // index 2
-	"Low",        // index 3
-	"Negligible", // index 4
-	"Unknown",    // index 5
+	"Critical",
+	"High",
+	"Medium",
+	"Low",
+	"Negligible",
+	"Unknown",
 }
 
-// VulnerabilityLevelIndexFromString converts a canonical Quay severity name
-// (e.g. "High") to the integer index the API expects in event_config.level.
-// Returns (0, false) if the name is not recognised. The comparison is
-// case-sensitive to match the Quay UI strings exactly.
+// VulnerabilityLevelIndexFromString returns the API integer index for a Quay
+// severity name. Case-sensitive. Returns (0, false) if unrecognised.
 func VulnerabilityLevelIndexFromString(name string) (int32, bool) {
 	for i, s := range vulnerabilityLevels {
 		if s == name {
@@ -33,25 +30,21 @@ func VulnerabilityLevelIndexFromString(name string) (int32, bool) {
 	return 0, false
 }
 
-// VulnerabilityLevelInt32 extracts the vulnerability severity level from the
-// event config as an int32. The Quay API stores the level as an integer index
-// (0=Critical, 1=High, 2=Medium, 3=Low, 4=Negligible, 5=Unknown). Returns
-// false if the key is absent or nil.
+// VulnerabilityLevelInt32 returns the level index from the event config.
+// Returns false if the key is absent or nil.
 func (e EventConfig) VulnerabilityLevelInt32() (int32, bool) {
 	v, ok := e["level"]
 	if !ok || v == nil {
 		return 0, false
 	}
-	// JSON numbers unmarshal as float64.
 	if f, ok := v.(float64); ok {
 		return int32(f), true
 	}
 	return 0, false
 }
 
-// VulnerabilityLevelString extracts the vulnerability severity level from the
-// event config and returns the canonical Quay severity name (e.g. "High").
-// Returns ("", false) if the key is absent, nil, or the index is out of range.
+// VulnerabilityLevelString returns the Quay severity name for the level index
+// in the event config. Returns ("", false) if absent or out of range.
 func (e EventConfig) VulnerabilityLevelString() (string, bool) {
 	idx, ok := e.VulnerabilityLevelInt32()
 	if !ok {
@@ -75,8 +68,7 @@ type Notification struct {
 }
 
 // CreateNotificationRequest is the request body for creating a notification.
-// Note: the Quay API uses camelCase "eventConfig" in request bodies but
-// snake_case "event_config" in response bodies.
+// The Quay API uses camelCase "eventConfig" in requests but "event_config" in responses.
 type CreateNotificationRequest struct {
 	Event       string         `json:"event"`
 	Method      string         `json:"method"`

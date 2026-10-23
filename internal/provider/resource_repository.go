@@ -127,11 +127,9 @@ func (r *RepositoryResource) Read(ctx context.Context, req resource.ReadRequest,
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		// Quay returns 403 when the repository's namespace has been deleted
-		// out-of-band (the org no longer exists). Check whether the namespace
-		// itself is gone before surfacing the error — if it is, the repository
-		// is also gone and we remove it from state. If the namespace still
-		// exists, the 403 is a genuine permission error and should be reported.
+		// Quay returns 403 (not 404) when a repo's namespace has been deleted
+		// out-of-band. Only remove from state if the namespace is also gone;
+		// otherwise the 403 is a genuine permission error.
 		if client.IsForbidden(err) {
 			_, nsErr := r.client.GetOrganization(ctx, state.Namespace.ValueString())
 			if client.IsNotFound(nsErr) {
@@ -166,16 +164,12 @@ func (r *RepositoryResource) Update(ctx context.Context, req resource.UpdateRequ
 		return
 	}
 
-	// Change visibility if it differs
 	if plan.Visibility.ValueString() != state.Visibility.ValueString() {
 		if err := r.client.ChangeRepositoryVisibility(ctx, repoPath, client.ChangeVisibilityRequest{
 			Visibility: plan.Visibility.ValueString(),
 		}); err != nil {
-			// The description update already succeeded. Save state now so that
-			// the description change is recorded even though visibility failed.
-			// Use the current (pre-change) visibility so state is consistent
-			// with what actually exists in Quay — the visibility call failed so
-			// the old value is still in effect.
+			// Description already updated; save state with the old visibility
+			// so it reflects what Quay actually has.
 			repo.IsPublic = state.Visibility.ValueString() == client.VisibilityPublic
 			r.mapToState(repo, &plan)
 			resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -196,9 +190,8 @@ func (r *RepositoryResource) Delete(ctx context.Context, req resource.DeleteRequ
 		return
 	}
 
-	// Refuse to delete a repository that still contains active tags. Quay
-	// purges content immediately with no grace period, so this is a hard guard
-	// with no opt-out. Empty the repository first, then destroy.
+	// Quay purges tag content immediately with no grace period.
+	// Require the repository to be empty before deleting.
 	hasTags, err := r.client.HasRepositoryTags(ctx, state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Error Checking Repository Tags", err.Error())
@@ -226,7 +219,6 @@ func (r *RepositoryResource) Delete(ctx context.Context, req resource.DeleteRequ
 }
 
 func (r *RepositoryResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	// Import ID: namespace/name
 	parts, diags := splitImportID(resp, req.ID, 2, "my-org/my-repo")
 	if diags.HasError() {
 		return

@@ -32,11 +32,8 @@ func (c *Client) CreateOrganization(ctx context.Context, req CreateOrganizationR
 	if err := c.post(ctx, "organization/", req, nil); err != nil {
 		return nil, fmt.Errorf("creating organization %q: %w", req.Name, err)
 	}
-	// The POST /organization/ endpoint returns an empty 201 body, so a GET is
-	// required to read back the created resource. If this GET fails, the
-	// organization was already created in Quay — do not re-run apply without
-	// first verifying its existence, or the next apply will fail with a
-	// conflict.
+	// POST /organization/ returns an empty 201 body; a GET is required to read
+	// back the created resource.
 	org, err := c.GetOrganization(ctx, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("organization %q was already created but could not be read back: %w", req.Name, err)

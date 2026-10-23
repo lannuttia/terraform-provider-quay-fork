@@ -38,14 +38,10 @@ func New(baseURL, token string, timeout time.Duration) *Client {
 		token:   token,
 		httpClient: &http.Client{
 			Timeout: timeout,
-			// Refuse redirects on non-GET requests. Go's default behaviour
-			// follows the redirect and silently changes the method to GET, so
-			// a redirected DELETE would return 200 while nothing was deleted.
-			// Refuse redirects on non-GET requests. Go rewrites the method
-			// to GET before calling CheckRedirect (per RFC 7231), so we
-			// check via[0].Method — the original request — instead of
-			// req.Method. ErrUseLastResponse returns the redirect response
-			// directly; doOnce then treats it as an error.
+			// Refuse redirects on non-GET requests to prevent Go from
+			// silently rewriting the method to GET (per RFC 7231).
+			// via[0].Method holds the original method; req.Method is
+			// already rewritten by the time CheckRedirect fires.
 			CheckRedirect: func(req *http.Request, via []*http.Request) error {
 				if len(via) > 0 && via[0].Method != http.MethodGet {
 					return http.ErrUseLastResponse
@@ -108,9 +104,7 @@ func IsForbidden(err error) bool {
 }
 
 func (c *Client) newRequest(ctx context.Context, method, path string, body any) (*http.Request, error) {
-	// Split off any raw query string before joining the path, because
-	// url.JoinPath percent-encodes '?' which causes Quay to treat it as part
-	// of the path rather than a query delimiter.
+	// url.JoinPath percent-encodes '?', so split the query string first.
 	rawPath := path
 	rawQuery := ""
 	if idx := strings.IndexByte(path, '?'); idx >= 0 {
@@ -149,10 +143,8 @@ func (c *Client) newRequest(ctx context.Context, method, path string, body any) 
 	return req, nil
 }
 
-// retryable5xxCodes are transient server errors that are safe to retry only
-// for idempotent methods (GET, PUT, DELETE). POST is excluded because a
-// committed POST may have already mutated server state, so retrying could
-// create duplicate resources.
+// retryable5xxCodes are transient errors safe to retry on idempotent methods.
+// POST is excluded because a committed POST may have already mutated state.
 var retryable5xxCodes = map[int]bool{
 	http.StatusInternalServerError: true,
 	http.StatusBadGateway:          true,
@@ -163,7 +155,6 @@ var retryable5xxCodes = map[int]bool{
 const maxRetries = 3
 
 func (c *Client) do(req *http.Request, out any) error {
-	// Snapshot the body so we can replay it on retries.
 	var bodyBytes []byte
 	if req.Body != nil {
 		var err error
@@ -183,7 +174,6 @@ func (c *Client) do(req *http.Request, out any) error {
 			case <-time.After(c.retryDelay(attempt)):
 			}
 		}
-		// Restore the body for each attempt.
 		if bodyBytes != nil {
 			req.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 			req.ContentLength = int64(len(bodyBytes))
@@ -196,9 +186,6 @@ func (c *Client) do(req *http.Request, out any) error {
 		if !errors.As(lastErr, &apiErr) {
 			return lastErr
 		}
-		// 5xx transient errors are only retried for idempotent methods.
-		// POST is excluded: a committed POST may have already mutated state.
-		// 429 is not retried: immediately retrying would worsen rate limiting.
 		if req.Method != http.MethodPost && retryable5xxCodes[apiErr.StatusCode] {
 			continue
 		}

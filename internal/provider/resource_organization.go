@@ -121,20 +121,15 @@ func (r *OrganizationResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	// Save state immediately after the successful POST so the org is tracked
-	// even if the follow-up PUT fails. Without this, a failed PUT orphans the
-	// org in Quay with no Terraform state — every subsequent apply then fails
-	// with "already exists" because the provider tries to re-create it.
+	// Save state before the follow-up PUT so a failure there doesn't orphan the org.
 	r.mapToState(org, &plan)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Apply any update-only fields (those not accepted by the create endpoint)
-	// immediately after create. Only send the PUT when the user explicitly set
-	// a value — guard against unknown values (computed fields not yet resolved)
-	// which are non-null but have no user-supplied value.
+	// Fields not accepted by POST are applied via a follow-up PUT.
+	// Unknown values are computed fields the user did not set; skip them.
 	needsUpdate := (!plan.InvoiceEmail.IsNull() && !plan.InvoiceEmail.IsUnknown()) ||
 		(!plan.InvoiceEmailAddress.IsNull() && !plan.InvoiceEmailAddress.IsUnknown()) ||
 		(!plan.TagExpirationS.IsNull() && !plan.TagExpirationS.IsUnknown())
@@ -205,11 +200,8 @@ func (r *OrganizationResource) Delete(ctx context.Context, req resource.DeleteRe
 		return
 	}
 
-	// Refuse to delete an organization that still contains repositories. Quay
-	// immediately removes every repository, image, robot account, team and
-	// OAuth application with no grace period — including resources not managed
-	// by Terraform. This is a hard guard with no opt-out. Remove all
-	// repositories from the organization first, then destroy.
+	// Quay deletes all org content immediately with no grace period, including
+	// resources not managed by Terraform. Require the org to be empty first.
 	hasRepos, err := r.client.HasOrganizationRepositories(ctx, state.Name.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Error Checking Organization Repositories", err.Error())
@@ -239,7 +231,6 @@ func (r *OrganizationResource) Delete(ctx context.Context, req resource.DeleteRe
 }
 
 func (r *OrganizationResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	// Import ID is the organization name.
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root("name"), req.ID)...)
 }
 
