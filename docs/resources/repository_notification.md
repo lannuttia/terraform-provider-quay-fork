@@ -205,7 +205,7 @@ Required:
 
 Required:
 
-- `level` (Number) The minimum vulnerability severity level index that triggers the notification (0=Critical, 1=High, 2=Medium, 3=Low, 4=Negligible, 5=Unknown).
+- `level` (String) The minimum vulnerability severity level that triggers the notification. One of: Critical, High, Medium, Low, Negligible, Unknown. Notifications fire for vulnerabilities at or above this severity. These names match the severity labels shown in the Quay UI.
 
 
 <a id="nestedatt--webhook"></a>
