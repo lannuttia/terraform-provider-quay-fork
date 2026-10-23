@@ -34,9 +34,28 @@ func New(baseURL, token string, timeout time.Duration) *Client {
 	}
 	baseURL = strings.TrimRight(baseURL, "/")
 	return &Client{
-		baseURL:    baseURL,
-		token:      token,
-		httpClient: &http.Client{Timeout: timeout},
+		baseURL: baseURL,
+		token:   token,
+		httpClient: &http.Client{
+			Timeout: timeout,
+			// Refuse redirects on non-GET requests. Go's default behaviour
+			// follows the redirect and silently changes the method to GET, so
+			// a redirected DELETE would return 200 while nothing was deleted.
+			// Refuse redirects on non-GET requests. Go rewrites the method
+			// to GET before calling CheckRedirect (per RFC 7231), so we
+			// check via[0].Method — the original request — instead of
+			// req.Method. ErrUseLastResponse returns the redirect response
+			// directly; doOnce then treats it as an error.
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				if len(via) > 0 && via[0].Method != http.MethodGet {
+					return http.ErrUseLastResponse
+				}
+				if len(via) >= 10 {
+					return fmt.Errorf("too many redirects")
+				}
+				return nil
+			},
+		},
 		retryDelay: func(attempt int) time.Duration {
 			return time.Duration(attempt) * time.Second
 		},
@@ -198,6 +217,13 @@ func (c *Client) doOnce(req *http.Request, out any) error {
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("reading response body: %w", err)
+	}
+
+	if resp.StatusCode >= 300 && resp.StatusCode < 400 && req.Method != http.MethodGet {
+		return &APIError{
+			StatusCode: resp.StatusCode,
+			Message:    fmt.Sprintf("unexpected redirect for %s request", req.Method),
+		}
 	}
 
 	if resp.StatusCode >= 400 {

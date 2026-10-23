@@ -138,6 +138,52 @@ func TestRetry_429(t *testing.T) {
 	}
 }
 
+// ----- Redirect behaviour -------------------------------------------------
+
+// TestRedirect_NonGETRefused verifies that redirects on non-GET requests are
+// refused. Without a CheckRedirect handler, Go follows the redirect and changes
+// the method to GET, so a redirected DELETE returns 200 while nothing is
+// deleted. The client should return an error instead.
+func TestRedirect_NonGETRefused(t *testing.T) {
+	// Target server: responds 200 to anything — represents the redirect destination.
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]string{})
+	}))
+	t.Cleanup(target.Close)
+
+	// Origin server: redirects every request to the target.
+	origin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, target.URL+r.URL.Path, http.StatusMovedPermanently)
+	}))
+	t.Cleanup(origin.Close)
+
+	c := client.NewTestClient(origin.URL, "test-token")
+	err := c.DeleteRepository(context.Background(), "org/repo")
+	if err == nil {
+		t.Fatal("expected error for redirected DELETE, got nil")
+	}
+}
+
+// TestRedirect_GETAllowed verifies that redirects on GET requests are still
+// followed normally.
+func TestRedirect_GETAllowed(t *testing.T) {
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, client.Repository{Namespace: "org", Name: "repo"})
+	}))
+	t.Cleanup(target.Close)
+
+	origin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, target.URL+r.URL.Path, http.StatusMovedPermanently)
+	}))
+	t.Cleanup(origin.Close)
+
+	c := client.NewTestClient(origin.URL, "test-token")
+	_, err := c.GetRepository(context.Background(), "org/repo")
+	if err != nil {
+		t.Fatalf("expected GET redirect to succeed, got: %v", err)
+	}
+}
+
 // ----- Authorization header -----------------------------------------------
 
 func TestAuthorizationHeader(t *testing.T) {
