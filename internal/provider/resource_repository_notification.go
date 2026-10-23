@@ -4,13 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-framework-validators/int32validator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/resourcevalidator"
+	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/diag"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int32planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -106,7 +105,7 @@ type BuildEvent struct {
 }
 
 type VulnerabilityFoundEvent struct {
-	Level types.Int32 `tfsdk:"level"`
+	Level types.String `tfsdk:"level"`
 }
 
 type RepoMirrorSyncStartedEvent struct{}
@@ -324,11 +323,16 @@ func (r *RepositoryNotificationResource) Schema(_ context.Context, _ resource.Sc
 				Description:   "Trigger when a vulnerability is found. The required level attribute sets the minimum severity that triggers the notification.",
 				PlanModifiers: requiresReplaceObj,
 				Attributes: map[string]schema.Attribute{
-					"level": schema.Int32Attribute{
-						Required:      true,
-						Description:   "The minimum vulnerability severity level index that triggers the notification (0=Critical, 1=High, 2=Medium, 3=Low, 4=Negligible, 5=Unknown).",
-						Validators:    []validator.Int32{int32validator.Between(0, 5)},
-						PlanModifiers: []planmodifier.Int32{int32planmodifier.RequiresReplace()},
+					"level": schema.StringAttribute{
+						Required: true,
+						Description: "The minimum vulnerability severity level that triggers the notification. " +
+							"One of: Critical, High, Medium, Low, Negligible, Unknown. " +
+							"Notifications fire for vulnerabilities at or above this severity. " +
+							"These names match the severity labels shown in the Quay UI.",
+						Validators: []validator.String{
+							stringvalidator.OneOf("Critical", "High", "Medium", "Low", "Negligible", "Unknown"),
+						},
+						PlanModifiers: requiresReplaceStr,
 					},
 				},
 			},
@@ -544,7 +548,8 @@ func (m *RepositoryNotificationResourceModel) eventAndConfig() (string, map[stri
 	case m.BuildCancelled != nil:
 		return "build_cancelled", buildRefRegexConfig(m.BuildCancelled.RefRegex)
 	case m.VulnerabilityFound != nil:
-		return "vulnerability_found", map[string]any{"level": m.VulnerabilityFound.Level.ValueInt32()}
+		idx, _ := client.VulnerabilityLevelIndexFromString(m.VulnerabilityFound.Level.ValueString())
+		return "vulnerability_found", map[string]any{"level": idx}
 	case m.RepoMirrorSyncStarted != nil:
 		return "repo_mirror_sync_started", map[string]any{}
 	case m.RepoMirrorSyncSuccess != nil:
@@ -646,9 +651,15 @@ func (r *RepositoryNotificationResource) mapToState(notif *client.Notification, 
 	case "build_cancelled":
 		state.BuildCancelled = &BuildEvent{RefRegex: refRegexFromEventConfig(notif.EventConfig)}
 	case "vulnerability_found":
-		level, _ := notif.EventConfig.VulnerabilityLevelInt32()
+		levelStr, ok := notif.EventConfig.VulnerabilityLevelString()
+		if !ok {
+			diags.AddError("Unknown Vulnerability Level",
+				fmt.Sprintf("The Quay API returned an unrecognised vulnerability level in event_config: %v. "+
+					"Please report this as a provider bug.", notif.EventConfig["level"]))
+			return diags
+		}
 		state.VulnerabilityFound = &VulnerabilityFoundEvent{
-			Level: types.Int32Value(level),
+			Level: types.StringValue(levelStr),
 		}
 	case "repo_mirror_sync_started":
 		state.RepoMirrorSyncStarted = &RepoMirrorSyncStartedEvent{}

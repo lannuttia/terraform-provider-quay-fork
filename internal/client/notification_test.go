@@ -137,6 +137,73 @@ func TestCreateRepoNotification_VulnerabilityLevelSentAsInt32(t *testing.T) {
 	}
 }
 
+// TestEventConfig_VulnerabilityLevelString asserts that EventConfig.VulnerabilityLevelString
+// returns the canonical Quay severity name for each integer index, and ("", false) when
+// the key is absent or the index is out of range.
+func TestEventConfig_VulnerabilityLevelString(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  client.EventConfig
+		wantStr string
+		wantOK  bool
+	}{
+		{"critical", client.EventConfig{"level": float64(0)}, "Critical", true},
+		{"high", client.EventConfig{"level": float64(1)}, "High", true},
+		{"medium", client.EventConfig{"level": float64(2)}, "Medium", true},
+		{"low", client.EventConfig{"level": float64(3)}, "Low", true},
+		{"negligible", client.EventConfig{"level": float64(4)}, "Negligible", true},
+		{"unknown", client.EventConfig{"level": float64(5)}, "Unknown", true},
+		{"absent", client.EventConfig{}, "", false},
+		{"nil value", client.EventConfig{"level": nil}, "", false},
+		{"out of range", client.EventConfig{"level": float64(99)}, "", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := tt.config.VulnerabilityLevelString()
+			if ok != tt.wantOK {
+				t.Fatalf("VulnerabilityLevelString() ok = %v, want %v", ok, tt.wantOK)
+			}
+			if ok && got != tt.wantStr {
+				t.Errorf("VulnerabilityLevelString() = %q, want %q", got, tt.wantStr)
+			}
+		})
+	}
+}
+
+// TestVulnerabilityLevelIndexFromString asserts that VulnerabilityLevelIndexFromString
+// returns the correct integer index for each canonical Quay severity name, and
+// (-1, false) for unrecognised strings.
+func TestVulnerabilityLevelIndexFromString(t *testing.T) {
+	tests := []struct {
+		input     string
+		wantIndex int32
+		wantOK    bool
+	}{
+		{"Critical", 0, true},
+		{"High", 1, true},
+		{"Medium", 2, true},
+		{"Low", 3, true},
+		{"Negligible", 4, true},
+		{"Unknown", 5, true},
+		{"critical", 0, false}, // case-sensitive
+		{"", 0, false},
+		{"Bogus", 0, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got, ok := client.VulnerabilityLevelIndexFromString(tt.input)
+			if ok != tt.wantOK {
+				t.Fatalf("VulnerabilityLevelIndexFromString(%q) ok = %v, want %v", tt.input, ok, tt.wantOK)
+			}
+			if ok && got != tt.wantIndex {
+				t.Errorf("VulnerabilityLevelIndexFromString(%q) = %d, want %d", tt.input, got, tt.wantIndex)
+			}
+		})
+	}
+}
+
 // TestEventConfig_VulnerabilityLevelInt32 asserts that EventConfig.VulnerabilityLevelInt32
 // returns the level as an int32 and false when the key is absent.
 func TestEventConfig_VulnerabilityLevelInt32(t *testing.T) {

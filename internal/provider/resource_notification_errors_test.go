@@ -79,10 +79,12 @@ resource "quay_repository_notification" "bad" {
 	})
 }
 
-// TestAccRepositoryNotification_VulnerabilityLevelStringRejected asserts that
-// passing a string (the old schema type) is now rejected, since level is an
-// Int64 that maps directly to the Quay API integer index.
-func TestAccRepositoryNotification_VulnerabilityLevelStringRejected(t *testing.T) {
+// TestAccRepositoryNotification_VulnerabilityLevelUnknownStringRejected asserts
+// that an unrecognised severity string is rejected at plan time by the OneOf
+// validator. The level attribute now accepts the canonical Quay severity names
+// ("Critical", "High", "Medium", "Low", "Negligible", "Unknown") — not
+// arbitrary strings or the old integer index.
+func TestAccRepositoryNotification_VulnerabilityLevelUnknownStringRejected(t *testing.T) {
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: providerFactories(),
 		Steps: []resource.TestStep{
@@ -91,18 +93,20 @@ func TestAccRepositoryNotification_VulnerabilityLevelStringRejected(t *testing.T
 resource "quay_repository_notification" "bad" {
   repository          = "myorg/myrepo"
   webhook             = { url = "https://example.com" }
-  vulnerability_found = { level = "High" }
+  vulnerability_found = { level = "critical" }
 }
 `,
-				ExpectError: regexp.MustCompile(`(?i)(inappropriate value|number|int)`),
+				ExpectError: regexp.MustCompile(`(?i)(one of|invalid attribute value|value must be)`),
 			},
 		},
 	})
 }
 
-// TestAccRepositoryNotification_VulnerabilityLevelOutOfRange asserts that an
-// integer outside the valid Quay index range (0–5) is rejected at plan time.
-func TestAccRepositoryNotification_VulnerabilityLevelOutOfRange(t *testing.T) {
+// TestAccRepositoryNotification_VulnerabilityLevelIntegerRejected asserts that
+// a bare integer is no longer accepted for vulnerability_found.level. HCL
+// coerces it to a string (e.g. "6") which the OneOf validator then rejects as
+// not being a valid severity name.
+func TestAccRepositoryNotification_VulnerabilityLevelIntegerRejected(t *testing.T) {
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: providerFactories(),
 		Steps: []resource.TestStep{
@@ -114,7 +118,7 @@ resource "quay_repository_notification" "bad" {
   vulnerability_found = { level = 6 }
 }
 `,
-				ExpectError: regexp.MustCompile(`(?i)(between|must be at least|value must be)`),
+				ExpectError: regexp.MustCompile(`(?i)(one of|invalid attribute value|value must be)`),
 			},
 		},
 	})
