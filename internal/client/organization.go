@@ -9,11 +9,11 @@ import (
 type Organization struct {
 	Name                string `json:"name"`
 	Email               string `json:"email"`
-	InvoiceEmail        bool   `json:"invoice_email,omitempty"`
-	InvoiceEmailAddress string `json:"invoice_email_address,omitempty"`
-	TagExpirationS      int    `json:"tag_expiration_s,omitempty"`
-	IsOrganization      bool   `json:"is_organization,omitempty"`
-	IsFreeAccount       bool   `json:"is_free_account,omitempty"`
+	InvoiceEmail        bool   `json:"invoice_email"`
+	InvoiceEmailAddress string `json:"invoice_email_address"`
+	TagExpirationS      int    `json:"tag_expiration_s"`
+	IsOrganization      bool   `json:"is_organization"`
+	IsFreeAccount       bool   `json:"is_free_account"`
 }
 
 type CreateOrganizationRequest struct {

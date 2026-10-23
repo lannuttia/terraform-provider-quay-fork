@@ -11,6 +11,46 @@ import (
 	"github.com/quay/terraform-provider-quay/internal/client"
 )
 
+// TestOrganization_MarshalZeroValues ensures that zero/false values on the
+// Organization response struct are preserved when the struct is marshalled to
+// JSON. Fields tagged with omitempty silently drop false booleans, empty
+// strings, and zero integers, which corrupts any downstream code that
+// re-serialises the struct (e.g. caching, logging, or future client features).
+func TestOrganization_MarshalZeroValues(t *testing.T) {
+	org := client.Organization{
+		Name:                "myorg",
+		Email:               "",
+		InvoiceEmail:        false,
+		InvoiceEmailAddress: "",
+		TagExpirationS:      0,
+		IsOrganization:      false,
+		IsFreeAccount:       false,
+	}
+
+	data, err := json.Marshal(org)
+	if err != nil {
+		t.Fatalf("unexpected marshal error: %v", err)
+	}
+
+	var got map[string]any
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("unexpected unmarshal error: %v", err)
+	}
+
+	requiredKeys := []string{
+		"invoice_email",
+		"invoice_email_address",
+		"tag_expiration_s",
+		"is_organization",
+		"is_free_account",
+	}
+	for _, key := range requiredKeys {
+		if _, exists := got[key]; !exists {
+			t.Errorf("key %q was missing from marshalled Organization; omitempty is dropping the zero value", key)
+		}
+	}
+}
+
 func TestCreateOrganization(t *testing.T) {
 	created := false
 	srv, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
