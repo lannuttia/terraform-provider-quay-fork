@@ -482,10 +482,14 @@ func (r *RepositoryNotificationResource) ImportState(ctx context.Context, req re
 		return
 	}
 	repository := parts[0] + "/" + parts[1]
+	uuid := parts[2]
 	setAttrs(ctx, resp, map[string]string{
-		"id":         req.ID,
+		// id is derived from the parsed parts, not passed through verbatim from
+		// req.ID. This guarantees id is always canonical (repository+"/"+uuid)
+		// and matches the value mapToState computes during Create and Read.
+		"id":         repository + "/" + uuid,
 		"repository": repository,
-		"uuid":       parts[2],
+		"uuid":       uuid,
 	})
 }
 
