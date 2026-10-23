@@ -47,6 +47,12 @@ func (c *Client) CreateRepository(ctx context.Context, req CreateRepositoryReque
 	if err := c.post(ctx, "repository", req, &repo); err != nil {
 		return nil, fmt.Errorf("creating repository %q: %w", req.Repository, err)
 	}
+	// The Quay POST /repository endpoint returns the created repository object
+	// but omits description from the response body even when one was supplied.
+	// Populate it from the request so state is consistent without a second GET.
+	if repo.Description == "" && req.Description != "" {
+		repo.Description = req.Description
+	}
 	return &repo, nil
 }
 

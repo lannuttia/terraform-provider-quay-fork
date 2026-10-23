@@ -113,11 +113,11 @@ resource "quay_repository_notification" "test" {
   repository          = quay_repository.test.id
   title               = "vuln alert"
   webhook             = { url = "https://httpbin.org/post" }
-  vulnerability_found = { level = 1 }
+  vulnerability_found = { level = "High" }
 }
 `, orgName),
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr("quay_repository_notification.test", "vulnerability_found.level", "1"),
+					resource.TestCheckResourceAttr("quay_repository_notification.test", "vulnerability_found.level", "High"),
 					resource.TestCheckResourceAttrSet("quay_repository_notification.test", "uuid"),
 				),
 			},

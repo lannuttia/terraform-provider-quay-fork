@@ -103,23 +103,48 @@ resource "quay_organization" "bad" {
 }
 
 // TestOrganizationSchema_TagExpirationAcceptsValidDurations asserts that valid
-// Go duration strings are accepted at plan time.
+// Go duration strings pass plan-time validation. Uses a mock HTTP server so the
+// test never touches a real Quay instance and is not sensitive to Quay's
+// server-side whitelist of allowed tag_expiration_s values.
 func TestOrganizationSchema_TagExpirationAcceptsValidDurations(t *testing.T) {
 	cases := []string{"0s", "24h", "168h", "1h30m", "30m"}
 	for _, d := range cases {
 		t.Run(d, func(t *testing.T) {
+			dur, _ := time.ParseDuration(d)
+			secs := int(dur.Seconds())
+
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				switch r.Method {
+				case http.MethodPost:
+					w.WriteHeader(http.StatusCreated)
+					_, _ = w.Write([]byte("{}"))
+				case http.MethodGet:
+					_, _ = fmt.Fprintf(w, `{"name":"myorg","email":"","invoice_email":false,"invoice_email_address":"","tag_expiration_s":%d,"is_organization":true,"is_free_account":true}`, secs)
+				case http.MethodPut:
+					_, _ = fmt.Fprintf(w, `{"name":"myorg","email":"","invoice_email":false,"invoice_email_address":"","tag_expiration_s":%d,"is_organization":true,"is_free_account":true}`, secs)
+				default:
+					http.NotFound(w, r)
+				}
+			}))
+			defer srv.Close()
+
 			resource.UnitTest(t, resource.TestCase{
 				ProtoV6ProviderFactories: providerFactories(),
 				Steps: []resource.TestStep{
 					{
-						Config: providerConfig() + fmt.Sprintf(`
+						Config: fmt.Sprintf(`
+provider "quay" {
+  url   = %q
+  token = "test-token"
+}
 resource "quay_organization" "test" {
   name           = "myorg"
   tag_expiration = %q
 }
-`, d),
-						// Plan succeeds; apply fails (no live Quay).
-						ExpectError: regexp.MustCompile(`(?i)(404|not found|Error Creating|403)`),
+`, srv.URL, d),
+						// No ExpectError — both plan and apply should succeed
+						// against the mock server.
 					},
 				},
 			})
