@@ -186,6 +186,68 @@ resource "quay_repository_notification" "bad" {
 	})
 }
 
+// TestNotificationSchema_QuayNotificationKindValidator asserts that
+// quay_notification.target.kind is validated as either "user" or "team" at
+// plan time. Without this, an invalid kind (e.g. "org") is accepted by
+// Terraform but rejected by the Quay API with an opaque error at apply time.
+func TestNotificationSchema_QuayNotificationKindValidator(t *testing.T) {
+	s := schemaFor(t, provider.NewRepositoryNotificationResource)
+	attr := nestedAttr(t, s, "quay_notification", "target", "kind")
+
+	strAttr, ok := attr.(schema.StringAttribute)
+	if !ok {
+		t.Fatalf("quay_notification.target.kind: expected schema.StringAttribute, got %T", attr)
+	}
+	if len(strAttr.Validators) == 0 {
+		t.Error("quay_notification.target.kind: no validators defined — invalid values like \"org\" are silently accepted at plan time and only rejected by the Quay API at apply time")
+	}
+}
+
+// TestNotificationSchema_QuayNotificationKindRejectsInvalidValue asserts that
+// an invalid kind is rejected at plan time.
+func TestNotificationSchema_QuayNotificationKindRejectsInvalidValue(t *testing.T) {
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: providerFactories(),
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig() + `
+resource "quay_repository_notification" "bad" {
+  repository        = "myorg/myrepo"
+  quay_notification = { target = { kind = "org", name = "myorg" } }
+  repo_push         = {}
+}
+`,
+				ExpectError: regexp.MustCompile(`(?i)(one of|invalid attribute value|value must be)`),
+			},
+		},
+	})
+}
+
+// TestNotificationSchema_QuayNotificationKindAcceptsValidValues asserts that
+// "user" and "team" are both accepted at plan time.
+func TestNotificationSchema_QuayNotificationKindAcceptsValidValues(t *testing.T) {
+	for _, kind := range []string{"user", "team"} {
+		t.Run(kind, func(t *testing.T) {
+			resource.UnitTest(t, resource.TestCase{
+				ProtoV6ProviderFactories: providerFactories(),
+				Steps: []resource.TestStep{
+					{
+						Config: providerConfig() + `
+resource "quay_repository_notification" "test" {
+  repository        = "myorg/myrepo"
+  quay_notification = { target = { kind = "` + kind + `", name = "someone" } }
+  repo_push         = {}
+}
+`,
+						// Plan succeeds; apply fails with no live Quay.
+						ExpectError: regexp.MustCompile(`(?i)(404|not found|Error Creating|403)`),
+					},
+				},
+			})
+		})
+	}
+}
+
 // TestNotificationSchema_VulnerabilityLevelAcceptsValidStrings asserts that
 // each canonical Quay severity name is accepted at plan time.
 func TestNotificationSchema_VulnerabilityLevelAcceptsValidStrings(t *testing.T) {

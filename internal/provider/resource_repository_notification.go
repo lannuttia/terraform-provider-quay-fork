@@ -263,8 +263,11 @@ func (r *RepositoryNotificationResource) Schema(_ context.Context, _ resource.Sc
 						PlanModifiers: requiresReplaceObj,
 						Attributes: map[string]schema.Attribute{
 							"kind": schema.StringAttribute{
-								Required:      true,
-								Description:   `The kind of target: "user" to notify an individual Quay account, or "team" to notify all members of an organization team.`,
+								Required:    true,
+								Description: `The kind of target: "user" to notify an individual Quay account, or "team" to notify all members of an organization team.`,
+								Validators: []validator.String{
+									stringvalidator.OneOf("user", "team"),
+								},
 								PlanModifiers: requiresReplaceStr,
 							},
 							"name": schema.StringAttribute{
