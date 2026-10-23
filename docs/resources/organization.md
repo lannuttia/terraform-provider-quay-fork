@@ -31,7 +31,7 @@ resource "quay_organization" "example" {
 - `email` (String) The contact email address for the organization.
 - `invoice_email` (Boolean) Whether the organization receives invoice emails.
 - `invoice_email_address` (String) The email address to send invoices to.
-- `tag_expiration` (String) The default tag expiration for the organization as a Go duration string (e.g. "24h", "168h", "0s" to disable).
+- `tag_expiration_s` (Number) The default tag expiration in seconds for the organization.
 
 ### Read-Only
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-framework-timetypes/timetypes"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -18,13 +17,13 @@ type OrganizationDataSource struct {
 }
 
 type OrganizationDataSourceModel struct {
-	Name                types.String         `tfsdk:"name"`
-	Email               types.String         `tfsdk:"email"`
-	InvoiceEmail        types.Bool           `tfsdk:"invoice_email"`
-	InvoiceEmailAddress types.String         `tfsdk:"invoice_email_address"`
-	TagExpiration       timetypes.GoDuration `tfsdk:"tag_expiration"`
-	IsOrganization      types.Bool           `tfsdk:"is_organization"`
-	IsFreeAccount       types.Bool           `tfsdk:"is_free_account"`
+	Name                types.String `tfsdk:"name"`
+	Email               types.String `tfsdk:"email"`
+	InvoiceEmail        types.Bool   `tfsdk:"invoice_email"`
+	InvoiceEmailAddress types.String `tfsdk:"invoice_email_address"`
+	TagExpirationS      types.Int64  `tfsdk:"tag_expiration_s"`
+	IsOrganization      types.Bool   `tfsdk:"is_organization"`
+	IsFreeAccount       types.Bool   `tfsdk:"is_free_account"`
 }
 
 func NewOrganizationDataSource() datasource.DataSource {
@@ -55,10 +54,9 @@ func (d *OrganizationDataSource) Schema(_ context.Context, _ datasource.SchemaRe
 				Computed:    true,
 				Description: "The invoice email address.",
 			},
-			"tag_expiration": schema.StringAttribute{
+			"tag_expiration_s": schema.Int64Attribute{
 				Computed:    true,
-				CustomType:  timetypes.GoDurationType{},
-				Description: "The default tag expiration for the organization as a Go duration string (e.g. \"24h\").",
+				Description: "The default tag expiration in seconds.",
 			},
 			"is_organization": schema.BoolAttribute{
 				Computed:    true,
@@ -101,9 +99,7 @@ func (d *OrganizationDataSource) Read(ctx context.Context, req datasource.ReadRe
 	state.Email = types.StringValue(org.Email)
 	state.InvoiceEmail = types.BoolValue(org.InvoiceEmail)
 	state.InvoiceEmailAddress = types.StringValue(org.InvoiceEmailAddress)
-	state.TagExpiration = timetypes.NewGoDurationValueFromStringMust(
-		fmt.Sprintf("%ds", org.TagExpirationS),
-	)
+	state.TagExpirationS = types.Int64Value(int64(org.TagExpirationS))
 	state.IsOrganization = types.BoolValue(org.IsOrganization)
 	state.IsFreeAccount = types.BoolValue(org.IsFreeAccount)
 

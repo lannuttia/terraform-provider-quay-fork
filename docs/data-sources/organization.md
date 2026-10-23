@@ -32,4 +32,4 @@ data "quay_organization" "example" {
 - `invoice_email_address` (String) The invoice email address.
 - `is_free_account` (Boolean) Whether the organization is on a free plan.
 - `is_organization` (Boolean) Whether this namespace is an organization (vs. a user namespace).
-- `tag_expiration` (String) The default tag expiration for the organization as a Go duration string (e.g. "24h").
+- `tag_expiration_s` (Number) The default tag expiration in seconds.

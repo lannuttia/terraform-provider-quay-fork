@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-framework-timetypes/timetypes"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -23,12 +23,12 @@ type OrganizationResource struct {
 }
 
 type OrganizationResourceModel struct {
-	ID                  types.String         `tfsdk:"id"`
-	Name                types.String         `tfsdk:"name"`
-	Email               types.String         `tfsdk:"email"`
-	InvoiceEmail        types.Bool           `tfsdk:"invoice_email"`
-	InvoiceEmailAddress types.String         `tfsdk:"invoice_email_address"`
-	TagExpiration       timetypes.GoDuration `tfsdk:"tag_expiration"`
+	ID                  types.String `tfsdk:"id"`
+	Name                types.String `tfsdk:"name"`
+	Email               types.String `tfsdk:"email"`
+	InvoiceEmail        types.Bool   `tfsdk:"invoice_email"`
+	InvoiceEmailAddress types.String `tfsdk:"invoice_email_address"`
+	TagExpirationS      types.Int64  `tfsdk:"tag_expiration_s"`
 }
 
 func NewOrganizationResource() resource.Resource {
@@ -81,13 +81,12 @@ func (r *OrganizationResource) Schema(_ context.Context, _ resource.SchemaReques
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"tag_expiration": schema.StringAttribute{
+			"tag_expiration_s": schema.Int64Attribute{
 				Optional:    true,
 				Computed:    true,
-				CustomType:  timetypes.GoDurationType{},
-				Description: "The default tag expiration for the organization as a Go duration string (e.g. \"24h\", \"168h\", \"0s\" to disable). Accepts any duration valid for Go's time.ParseDuration.",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
+				Description: "The default tag expiration in seconds for the organization.",
+				PlanModifiers: []planmodifier.Int64{
+					int64planmodifier.UseStateForUnknown(),
 				},
 			},
 		},
@@ -138,18 +137,13 @@ func (r *OrganizationResource) Create(ctx context.Context, req resource.CreateRe
 	// which are non-null but have no user-supplied value.
 	needsUpdate := (!plan.InvoiceEmail.IsNull() && !plan.InvoiceEmail.IsUnknown()) ||
 		(!plan.InvoiceEmailAddress.IsNull() && !plan.InvoiceEmailAddress.IsUnknown()) ||
-		(!plan.TagExpiration.IsNull() && !plan.TagExpiration.IsUnknown())
+		(!plan.TagExpirationS.IsNull() && !plan.TagExpirationS.IsUnknown())
 	if needsUpdate {
-		tagExpirationDur, diags := plan.TagExpiration.ValueGoDuration()
-		resp.Diagnostics.Append(diags...)
-		if resp.Diagnostics.HasError() {
-			return
-		}
 		updateReq := client.UpdateOrganizationRequest{
 			Email:               plan.Email.ValueString(),
 			InvoiceEmail:        plan.InvoiceEmail.ValueBool(),
 			InvoiceEmailAddress: plan.InvoiceEmailAddress.ValueString(),
-			TagExpirationS:      int(tagExpirationDur.Seconds()),
+			TagExpirationS:      int(plan.TagExpirationS.ValueInt64()),
 		}
 		org, err = r.client.UpdateOrganization(ctx, plan.Name.ValueString(), updateReq)
 		if err != nil {
@@ -189,16 +183,11 @@ func (r *OrganizationResource) Update(ctx context.Context, req resource.UpdateRe
 		return
 	}
 
-	tagExpirationDur, diags := plan.TagExpiration.ValueGoDuration()
-	resp.Diagnostics.Append(diags...)
-	if resp.Diagnostics.HasError() {
-		return
-	}
 	org, err := r.client.UpdateOrganization(ctx, plan.Name.ValueString(), client.UpdateOrganizationRequest{
 		Email:               plan.Email.ValueString(),
 		InvoiceEmail:        plan.InvoiceEmail.ValueBool(),
 		InvoiceEmailAddress: plan.InvoiceEmailAddress.ValueString(),
-		TagExpirationS:      int(tagExpirationDur.Seconds()),
+		TagExpirationS:      int(plan.TagExpirationS.ValueInt64()),
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Error Updating Organization", err.Error())
@@ -260,7 +249,5 @@ func (r *OrganizationResource) mapToState(org *client.Organization, state *Organ
 	state.Email = types.StringValue(org.Email)
 	state.InvoiceEmail = types.BoolValue(org.InvoiceEmail)
 	state.InvoiceEmailAddress = types.StringValue(org.InvoiceEmailAddress)
-	state.TagExpiration = timetypes.NewGoDurationValueFromStringMust(
-		fmt.Sprintf("%ds", org.TagExpirationS),
-	)
+	state.TagExpirationS = types.Int64Value(int64(org.TagExpirationS))
 }
