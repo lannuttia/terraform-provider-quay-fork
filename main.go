@@ -1,7 +1,6 @@
-// Generate provider documentation with tfplugindocs.
-//go:generate go tool tfplugindocs generate --provider-name quay
-
 package main
+
+//go:generate go tool tfplugindocs generate --provider-name quay
 
 import (
 	"context"
