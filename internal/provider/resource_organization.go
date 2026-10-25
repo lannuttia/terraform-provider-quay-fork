@@ -203,7 +203,10 @@ func (r *OrganizationResource) Delete(ctx context.Context, req resource.DeleteRe
 	}
 
 	// Quay deletes all org content immediately with no grace period, including
-	// resources not managed by Terraform. Require the org to be empty first.
+	// resources not managed by Terraform. Require the org to have no image
+	// repositories first. Note: the guard checks image repositories only —
+	// an org with robots, teams or OAuth applications but no repos will still
+	// be deleted along with those resources.
 	hasRepos, err := r.client.HasOrganizationRepositories(ctx, state.Name.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Error Checking Organization Repositories", err.Error())
@@ -213,13 +216,15 @@ func (r *OrganizationResource) Delete(ctx context.Context, req resource.DeleteRe
 		resp.Diagnostics.AddError(
 			"Cannot Delete Non-Empty Organization",
 			fmt.Sprintf(
-				"Organization %q still contains repositories. Deleting it would permanently "+
-					"destroy every repository, image, robot account, team and OAuth application "+
-					"in the organization — including resources not managed by Terraform — "+
-					"with no grace period.\n\n"+
+				"Organization %q still contains image repositories. Deleting it would "+
+					"permanently destroy every repository, image, robot account, team and "+
+					"OAuth application in the organization — including resources not managed "+
+					"by Terraform — with no grace period.\n\n"+
 					"Remove all repositories from the organization before destroying it. "+
 					"Note that changing `name` also triggers a replace (delete + create) "+
-					"which would delete all content.",
+					"which would delete all content. An organization that has only robots, "+
+					"teams or OAuth applications (but no repositories) is not protected by "+
+					"this guard.",
 				state.Name.ValueString(),
 			),
 		)

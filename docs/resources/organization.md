@@ -10,6 +10,23 @@ description: |-
 
 Manages a Quay organization.
 
+## Destruction behaviour
+
+Destroying or replacing a `quay_organization` resource permanently deletes the
+organization and all of its content — every repository, image, robot account,
+team and OAuth application — with no grace period, including resources not
+managed by Terraform.
+
+To guard against accidental data loss, the provider refuses to delete an
+organization that still contains image repositories. Remove all repositories
+before destroying the resource, or use
+[`lifecycle { prevent_destroy = true }`](https://developer.hashicorp.com/terraform/language/meta-arguments/lifecycle#prevent_destroy)
+to block destruction entirely.
+
+**Limitation:** the guard checks image repositories only. An organization that
+has robots, teams or OAuth applications but no image repositories will be
+deleted along with those resources without triggering the guard.
+
 ## Example Usage
 
 ```terraform

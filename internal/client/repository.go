@@ -120,7 +120,10 @@ type repoListResponse struct {
 }
 
 // HasOrganizationRepositories reports whether the organization namespace
-// contains at least one repository.
+// contains at least one image repository. Quay's list endpoint returns only
+// image repositories by default, so an org that has robots, teams or OAuth
+// applications but no repos is reported as empty and will be deleted along
+// with those resources.
 func (c *Client) HasOrganizationRepositories(ctx context.Context, name string) (bool, error) {
 	path := fmt.Sprintf("repository?namespace=%s", url.QueryEscape(name))
 	var resp repoListResponse
