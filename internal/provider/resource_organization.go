@@ -257,6 +257,8 @@ func (r *OrganizationResource) mapToState(org *client.Organization, state *Organ
 	}
 	if org.InvoiceEmailAddress != nil {
 		state.InvoiceEmailAddress = types.StringValue(*org.InvoiceEmailAddress)
+	} else {
+		state.InvoiceEmailAddress = types.StringValue("")
 	}
 	if org.TagExpirationS != nil {
 		state.TagExpirationS = types.Int64Value(int64(*org.TagExpirationS))

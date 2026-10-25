@@ -72,7 +72,8 @@ resource "quay_repository" "test" {
   description = ""
 }
 resource "quay_repository_notification" "test" {
-  repository    = quay_repository.test.id
+  namespace     = quay_repository.test.namespace
+  name          = quay_repository.test.name
   title         = "build failure slack"
   slack         = { url = "https://hooks.slack.com/services/T00000/B00000/XXXXXXXXXXXX" }
   build_failure = {}
@@ -111,7 +112,8 @@ resource "quay_repository" "test" {
   description = ""
 }
 resource "quay_repository_notification" "test" {
-  repository          = quay_repository.test.id
+  namespace           = quay_repository.test.namespace
+  name                = quay_repository.test.name
   title               = "vuln alert"
   webhook             = { url = "https://httpbin.org/post" }
   vulnerability_found = { level = "High" }
@@ -156,7 +158,8 @@ resource "quay_repository" "test" {
   description = ""
 }
 resource "quay_repository_notification" "test" {
-  repository          = quay_repository.test.id
+  namespace           = quay_repository.test.namespace
+  name                = quay_repository.test.name
   title               = "any severity"
   webhook             = { url = "https://httpbin.org/post" }
   vulnerability_found = {}
@@ -201,9 +204,10 @@ resource "quay_repository" "test" {
   description = ""
 }
 resource "quay_repository_notification" "test" {
-  repository       = quay_repository.test.id
-  title            = "image expiry alert"
-  webhook          = { url = "https://httpbin.org/post" }
+  namespace         = quay_repository.test.namespace
+  name              = quay_repository.test.name
+  title             = "image expiry alert"
+  webhook           = { url = "https://httpbin.org/post" }
   repo_image_expiry = { days = 7 }
 }
 `, orgName),
@@ -240,7 +244,8 @@ resource "quay_repository" "test" {
   description = ""
 }
 resource "quay_repository_notification" "test" {
-  repository    = quay_repository.test.id
+  namespace     = quay_repository.test.namespace
+  name          = quay_repository.test.name
   title         = "main branch build"
   webhook       = { url = "https://httpbin.org/post" }
   build_success = { ref_regex = "refs/heads/main" }
