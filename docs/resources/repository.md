@@ -10,6 +10,22 @@ description: |-
 
 Manages a Quay repository.
 
+## Destruction behaviour
+
+Destroying or replacing a `quay_repository` resource (including any change to
+`name` or `namespace`, which triggers a replace) permanently deletes the
+repository and all of its images with no grace period.
+
+To guard against accidental data loss, the provider refuses to delete a
+repository that still has active tags. Remove all tags before destroying the
+resource, or use
+[`lifecycle { prevent_destroy = true }`](https://developer.hashicorp.com/terraform/language/meta-arguments/lifecycle#prevent_destroy)
+to block destruction entirely.
+
+**Limitation:** the guard checks active tags only. Deleted tags that are still
+within the `tag_expiration_s` restore window are not counted and will be
+permanently lost when the repository is deleted.
+
 ## Example Usage
 
 ```terraform

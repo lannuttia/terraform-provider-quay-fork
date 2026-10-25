@@ -191,7 +191,7 @@ func (r *RepositoryResource) Delete(ctx context.Context, req resource.DeleteRequ
 	}
 
 	// Quay purges tag content immediately with no grace period.
-	// Require the repository to be empty before deleting.
+	// Require the repository to have no active tags before deleting.
 	hasTags, err := r.client.HasRepositoryTags(ctx, state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Error Checking Repository Tags", err.Error())
@@ -205,7 +205,9 @@ func (r *RepositoryResource) Delete(ctx context.Context, req resource.DeleteRequ
 					"permanently destroy all content with no grace period.\n\n"+
 					"Remove all tags from the repository before destroying it. "+
 					"Note that changing `name` or `namespace` also triggers a replace "+
-					"(delete + create) which would delete all content.",
+					"(delete + create) which would delete all content. Deleted tags "+
+					"that are still within the restore window are not protected by "+
+					"this guard and will be lost on deletion.",
 				state.ID.ValueString(),
 			),
 		)

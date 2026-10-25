@@ -102,6 +102,9 @@ type tagListResponse struct {
 
 // HasRepositoryTags reports whether the repository has at least one active tag.
 // It returns (false, nil) when the repository does not exist (404).
+// Only active tags are counted; deleted tags that are still within the
+// tag_expiration_s restore window are not included, so a repository that
+// appears empty may still have restorable content that is lost on deletion.
 func (c *Client) HasRepositoryTags(ctx context.Context, repository string) (bool, error) {
 	path := fmt.Sprintf("repository/%s/tag/?onlyActiveTags=true&limit=1", repository)
 	var resp tagListResponse
