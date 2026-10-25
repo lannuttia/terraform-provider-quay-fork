@@ -12,6 +12,7 @@ import (
 
 func TestCreateRepoNotification(t *testing.T) {
 	created := false
+	getCalled := false
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		notif := client.Notification{
 			UUID:        "abc-123",
@@ -24,7 +25,8 @@ func TestCreateRepoNotification(t *testing.T) {
 		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/notification/"):
 			created = true
 			writeJSON(w, http.StatusCreated, notif)
-		case r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/notification/abc-123"):
+		case r.Method == http.MethodGet:
+			getCalled = true
 			writeJSON(w, http.StatusOK, notif)
 		}
 	})
@@ -41,8 +43,52 @@ func TestCreateRepoNotification(t *testing.T) {
 	if !created {
 		t.Error("POST notification endpoint was never called")
 	}
+	// Quay's POST /notification/ returns the full notification object, so a
+	// follow-up GET opens an orphan window: if the GET fails after a
+	// successful POST, the notification fires indefinitely with no Terraform
+	// state entry tracking it.
+	if getCalled {
+		t.Error("CreateRepoNotification must not GET after POST; the POST response already contains the full notification")
+	}
 	if notif.UUID != "abc-123" {
 		t.Errorf("expected UUID abc-123, got %q", notif.UUID)
+	}
+}
+
+// TestCreateRepoNotification_GetFailsAfterPost demonstrates the orphan window.
+// If CreateRepoNotification issues a GET after a successful POST and that GET
+// fails, Create returns an error with no state entry — the notification already
+// exists in Quay and will keep firing, but Terraform has no record of it.
+func TestCreateRepoNotification_GetFailsAfterPost(t *testing.T) {
+	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/notification/"):
+			writeJSON(w, http.StatusCreated, client.Notification{
+				UUID:        "abc-123",
+				Event:       "repo_push",
+				Method:      "webhook",
+				Config:      map[string]any{"url": "https://example.com"},
+				EventConfig: map[string]any{},
+			})
+		case r.Method == http.MethodGet:
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"message": "unavailable"})
+		}
+	})
+
+	notif, err := c.CreateRepoNotification(context.Background(), "myorg/myrepo", client.CreateNotificationRequest{
+		Event:  "repo_push",
+		Method: "webhook",
+		Config: map[string]any{"url": "https://example.com"},
+	})
+	// With the GET-after-POST present, this returns an error and notif is nil —
+	// the notification exists in Quay but Terraform has no state entry.
+	// With the fix (POST body only), this succeeds and the uuid is tracked.
+	if err != nil {
+		t.Errorf("CreateRepoNotification returned an error when the POST succeeded; "+
+			"the notification exists in Quay but has no state entry: %v", err)
+	}
+	if notif == nil || notif.UUID != "abc-123" {
+		t.Errorf("expected uuid abc-123 from POST response, got %v", notif)
 	}
 }
 

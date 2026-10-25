@@ -82,11 +82,7 @@ func (c *Client) CreateRepoNotification(ctx context.Context, repository string, 
 	if err := c.post(ctx, fmt.Sprintf("repository/%s/notification/", repository), req, &notif); err != nil {
 		return nil, fmt.Errorf("creating notification on repository %q: %w", repository, err)
 	}
-	created, err := c.GetRepoNotification(ctx, repository, notif.UUID)
-	if err != nil {
-		return nil, fmt.Errorf("notification on repository %q was created (uuid %q) but could not be read back: %w", repository, notif.UUID, err)
-	}
-	return created, nil
+	return &notif, nil
 }
 
 func (c *Client) GetRepoNotification(ctx context.Context, repository, uuid string) (*Notification, error) {
