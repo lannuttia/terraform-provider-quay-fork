@@ -187,6 +187,77 @@ resource "quay_organization" "test" {
 	})
 }
 
+// TestAccOrganization_RemovingEmailClearsIt verifies that removing the email
+// attribute from config sends an explicit empty string to Quay and clears the
+// value. UseStateForUnknown on an Optional+Computed field causes Terraform to
+// copy the old state value into the plan when the attribute is absent, so no
+// update is ever sent and Quay keeps the old value.
+func TestAccOrganization_RemovingEmailClearsIt(t *testing.T) {
+	skipIfNoAcc(t)
+	orgName := rname("tf-acc-email-clear-org")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: providerFactories(),
+		CheckDestroy:             checkOrganizationDestroyed(orgName),
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig() + fmt.Sprintf(`
+resource "quay_organization" "test" {
+  name  = %q
+  email = "initial@example.com"
+}
+`, orgName),
+				Check: resource.TestCheckResourceAttr("quay_organization.test", "email", "initial@example.com"),
+			},
+			// Remove email from config. With the bug, UseStateForUnknown
+			// copies "initial@example.com" into the plan and no update is sent.
+			{
+				Config: providerConfig() + fmt.Sprintf(`
+resource "quay_organization" "test" {
+  name = %q
+}
+`, orgName),
+				Check: resource.TestCheckResourceAttr("quay_organization.test", "email", ""),
+			},
+		},
+	})
+}
+
+// TestAccOrganization_RemovingInvoiceEmailAddressClearsIt verifies that removing
+// invoice_email_address from config sends an explicit empty string to Quay and
+// clears the value.
+func TestAccOrganization_RemovingInvoiceEmailAddressClearsIt(t *testing.T) {
+	skipIfNoAcc(t)
+	orgName := rname("tf-acc-inv-addr-clear-org")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: providerFactories(),
+		CheckDestroy:             checkOrganizationDestroyed(orgName),
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig() + fmt.Sprintf(`
+resource "quay_organization" "test" {
+  name                  = %q
+  email                 = "tf-acc@example.com"
+  invoice_email_address = "billing@example.com"
+}
+`, orgName),
+				Check: resource.TestCheckResourceAttr("quay_organization.test", "invoice_email_address", "billing@example.com"),
+			},
+			// Remove invoice_email_address from config.
+			{
+				Config: providerConfig() + fmt.Sprintf(`
+resource "quay_organization" "test" {
+  name  = %q
+  email = "tf-acc@example.com"
+}
+`, orgName),
+				Check: resource.TestCheckResourceAttr("quay_organization.test", "invoice_email_address", ""),
+			},
+		},
+	})
+}
+
 func TestAccOrganization_DeleteNonEmpty(t *testing.T) {
 	skipIfNoAcc(t)
 	orgName := rname("tf-acc-nodel-org")

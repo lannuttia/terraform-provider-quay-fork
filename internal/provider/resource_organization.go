@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/quay/terraform-provider-quay/internal/client"
@@ -61,9 +62,7 @@ func (r *OrganizationResource) Schema(_ context.Context, _ resource.SchemaReques
 				Optional:    true,
 				Computed:    true,
 				Description: "The contact email address for the organization.",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
+				Default:     stringdefault.StaticString(""),
 			},
 			"invoice_email": schema.BoolAttribute{
 				Optional:    true,
@@ -77,9 +76,7 @@ func (r *OrganizationResource) Schema(_ context.Context, _ resource.SchemaReques
 				Optional:    true,
 				Computed:    true,
 				Description: "The email address to send invoices to.",
-				PlanModifiers: []planmodifier.String{
-					stringplanmodifier.UseStateForUnknown(),
-				},
+				Default:     stringdefault.StaticString(""),
 			},
 			"tag_expiration_s": schema.Int64Attribute{
 				Optional:    true,
