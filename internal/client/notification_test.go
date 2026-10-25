@@ -94,12 +94,16 @@ func TestCreateRepoNotification_GetFailsAfterPost(t *testing.T) {
 
 func TestGetRepoNotification(t *testing.T) {
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet {
-			writeJSON(w, http.StatusOK, client.Notification{
-				UUID:   "abc-123",
-				Event:  "repo_push",
-				Method: "webhook",
-				Config: map[string]any{"url": "https://example.com"},
+		if r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/notification/") {
+			writeJSON(w, http.StatusOK, map[string]any{
+				"notifications": []client.Notification{
+					{
+						UUID:   "abc-123",
+						Event:  "repo_push",
+						Method: "webhook",
+						Config: map[string]any{"url": "https://example.com"},
+					},
+				},
 			})
 		}
 	})
@@ -129,9 +133,11 @@ func TestDeleteRepoNotification(t *testing.T) {
 	}
 }
 
+// TestGetRepoNotification_NotFound verifies that looking up a uuid that is not
+// in the notification list returns IsNotFound.
 func TestGetRepoNotification_NotFound(t *testing.T) {
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusNotFound, map[string]string{"message": "not found"})
+		writeJSON(w, http.StatusOK, map[string]any{"notifications": []any{}})
 	})
 	_, err := c.GetRepoNotification(context.Background(), "myorg/myrepo", "missing")
 	if !client.IsNotFound(err) {

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -20,7 +21,8 @@ const DefaultTimeout = 30 * time.Second
 
 // ValidateURL returns an error if the URL is not acceptable. An empty string
 // is allowed (it defaults to https://quay.io). http:// URLs are rejected
-// because the bearer token would be sent in plaintext.
+// unless the host is a loopback address, since the bearer token would
+// otherwise be sent in plaintext over the network.
 func ValidateURL(rawURL string) error {
 	if rawURL == "" {
 		return nil
@@ -29,10 +31,21 @@ func ValidateURL(rawURL string) error {
 	if err != nil {
 		return fmt.Errorf("invalid URL %q: %w", rawURL, err)
 	}
-	if u.Scheme == "http" {
+	if u.Scheme == "http" && !isLoopback(u.Hostname()) {
 		return fmt.Errorf("http:// URLs are not permitted — the bearer token would be sent in plaintext; use https://")
 	}
 	return nil
+}
+
+// isLoopback reports whether host is a loopback address (127.x.x.x or ::1 or
+// "localhost"). http:// is permitted for loopback hosts to support local
+// development and acceptance testing against a containerised Quay instance.
+func isLoopback(host string) bool {
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 // Client is a Quay API client.

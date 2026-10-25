@@ -1,6 +1,8 @@
 package provider_test
 
 import (
+	"context"
+	"fmt"
 	"regexp"
 	"testing"
 
@@ -142,6 +144,71 @@ resource "quay_repository_notification" "bad" {
 }
 `,
 				ExpectError: regexp.MustCompile(`(?i)(required|missing|target)`),
+			},
+		},
+	})
+}
+
+// TestAccRepositoryNotification_DeletedOutOfBandRemovesFromState verifies that
+// when a notification is deleted out-of-band, a subsequent refresh removes it
+// from state rather than erroring. Read uses the repository list endpoint to
+// find the notification by uuid within the correct repository context, so a
+// missing notification is correctly detected even when Quay returns 400 (not
+// 404) for a GET on a deleted notification uuid.
+func TestAccRepositoryNotification_DeletedOutOfBandRemovesFromState(t *testing.T) {
+	skipIfNoAcc(t)
+	orgName := rname("tf-acc-notif-oob-org")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: providerFactories(),
+		CheckDestroy: resource.ComposeTestCheckFunc(
+			checkOrganizationDestroyed(orgName),
+			checkRepositoryDestroyed(orgName+"/oob-notif-repo"),
+		),
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig() + fmt.Sprintf(`
+resource "quay_organization" "test" {
+  name  = %q
+  email = "tf-acc-notif-oob@example.com"
+}
+resource "quay_repository" "test" {
+  namespace   = quay_organization.test.name
+  name        = "oob-notif-repo"
+  visibility  = "private"
+  description = ""
+}
+resource "quay_repository_notification" "test" {
+  repository = quay_repository.test.id
+  webhook    = { url = "https://httpbin.org/post" }
+  repo_push  = {}
+}
+`, orgName),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttrSet("quay_repository_notification.test", "uuid"),
+				),
+			},
+			// Delete the notification out-of-band. A subsequent refresh must
+			// remove it from state without error.
+			{
+				PreConfig: func() {
+					rs := resource.TestCheckResourceAttrSet("quay_repository_notification.test", "uuid")
+					_ = rs
+					c := quayClient()
+					ctx := context.Background()
+					// Retrieve the uuid from the list endpoint to delete it.
+					notifs, err := c.ListRepoNotifications(ctx, orgName+"/oob-notif-repo")
+					if err != nil {
+						t.Fatalf("listing notifications out-of-band: %v", err)
+					}
+					for _, n := range notifs {
+						if err := c.DeleteRepoNotification(ctx, orgName+"/oob-notif-repo", n.UUID); err != nil {
+							t.Fatalf("deleting notification out-of-band: %v", err)
+						}
+					}
+				},
+				RefreshState:       true,
+				ExpectNonEmptyPlan: true,
 			},
 		},
 	})

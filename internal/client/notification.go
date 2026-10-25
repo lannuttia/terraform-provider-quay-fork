@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"errors"
 	"fmt"
 )
 
@@ -85,17 +86,60 @@ func (c *Client) CreateRepoNotification(ctx context.Context, repository string, 
 	return &notif, nil
 }
 
+// notificationListResponse is the shape of GET repository/<repo>/notification/.
+type notificationListResponse struct {
+	Notifications []Notification `json:"notifications"`
+}
+
+func (c *Client) ListRepoNotifications(ctx context.Context, repository string) ([]Notification, error) {
+	var resp notificationListResponse
+	if err := c.get(ctx, fmt.Sprintf("repository/%s/notification/", repository), &resp); err != nil {
+		return nil, fmt.Errorf("listing notifications on repository %q: %w", repository, err)
+	}
+	return resp.Notifications, nil
+}
+
+// GetRepoNotification finds a notification by uuid from the repository's
+// notification list. Using the list endpoint ensures the notification is
+// verified within the correct repository context.
 func (c *Client) GetRepoNotification(ctx context.Context, repository, uuid string) (*Notification, error) {
-	var notif Notification
-	if err := c.get(ctx, fmt.Sprintf("repository/%s/notification/%s", repository, uuid), &notif); err != nil {
+	notifs, err := c.ListRepoNotifications(ctx, repository)
+	if err != nil {
 		return nil, fmt.Errorf("getting notification %q on repository %q: %w", uuid, repository, err)
 	}
-	return &notif, nil
+	for i := range notifs {
+		if notifs[i].UUID == uuid {
+			return &notifs[i], nil
+		}
+	}
+	return nil, fmt.Errorf("getting notification %q on repository %q: %w", uuid, repository, &APIError{StatusCode: 404, Message: "notification not found"})
 }
 
 func (c *Client) DeleteRepoNotification(ctx context.Context, repository, uuid string) error {
-	if err := c.delete(ctx, fmt.Sprintf("repository/%s/notification/%s", repository, uuid)); err != nil {
-		return fmt.Errorf("deleting notification %q on repository %q: %w", uuid, repository, err)
+	err := c.delete(ctx, fmt.Sprintf("repository/%s/notification/%s", repository, uuid))
+	if err == nil {
+		return nil
 	}
-	return nil
+	// Quay returns 400 "No repository notification found" when the notification
+	// is already gone, rather than 404.
+	if IsNotFound(err) {
+		return nil
+	}
+	if apiErr, ok := isNotificationNotFound(err); ok {
+		_ = apiErr
+		return nil
+	}
+	return fmt.Errorf("deleting notification %q on repository %q: %w", uuid, repository, err)
+}
+
+// isNotificationNotFound reports whether the error is Quay's 400 response for
+// a missing notification ("No repository notification found").
+func isNotificationNotFound(err error) (*APIError, bool) {
+	var apiErr *APIError
+	if errors.As(err, &apiErr) &&
+		apiErr.StatusCode == 400 &&
+		apiErr.Message == "No repository notification found" {
+		return apiErr, true
+	}
+	return nil, false
 }

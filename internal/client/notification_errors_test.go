@@ -49,16 +49,31 @@ func TestCreateRepoNotification_RepositoryNotFound(t *testing.T) {
 	}
 }
 
+// TestDeleteRepoNotification_NotFound verifies that a 404 on DELETE is treated
+// as "already gone" rather than an error, since the end state (notification
+// does not exist) is what was requested.
 func TestDeleteRepoNotification_NotFound(t *testing.T) {
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"message": "not found"})
 	})
-	err := c.DeleteRepoNotification(context.Background(), "myorg/myrepo", "missing-uuid")
-	if err == nil {
-		t.Fatal("expected error for delete of non-existent notification, got nil")
+	if err := c.DeleteRepoNotification(context.Background(), "myorg/myrepo", "missing-uuid"); err != nil {
+		t.Errorf("expected nil for 404 on delete, got: %v", err)
 	}
-	if !client.IsNotFound(err) {
-		t.Errorf("expected IsNotFound for missing notification, got: %v", err)
+}
+
+// TestDeleteRepoNotification_400NotificationNotFound verifies that Quay's 400
+// "No repository notification found" response is treated as "already gone"
+// rather than surfaced as an error. Quay returns 400 (not 404) when a DELETE
+// is issued for a notification that no longer exists.
+func TestDeleteRepoNotification_400NotificationNotFound(t *testing.T) {
+	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{
+			"message": "No repository notification found",
+		})
+	})
+	err := c.DeleteRepoNotification(context.Background(), "myorg/myrepo", "missing-uuid")
+	if err != nil {
+		t.Errorf("expected nil for 400 'No repository notification found', got: %v", err)
 	}
 }
 
