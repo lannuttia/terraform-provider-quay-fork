@@ -252,7 +252,13 @@ func (r *OrganizationResource) mapToState(org *client.Organization, state *Organ
 	state.ID = types.StringValue(org.Name)
 	state.Name = types.StringValue(org.Name)
 	state.Email = types.StringValue(org.Email)
-	state.InvoiceEmail = types.BoolValue(org.InvoiceEmail)
-	state.InvoiceEmailAddress = types.StringValue(org.InvoiceEmailAddress)
-	state.TagExpirationS = types.Int64Value(int64(org.TagExpirationS))
+	if org.InvoiceEmail != nil {
+		state.InvoiceEmail = types.BoolValue(*org.InvoiceEmail)
+	}
+	if org.InvoiceEmailAddress != nil {
+		state.InvoiceEmailAddress = types.StringValue(*org.InvoiceEmailAddress)
+	}
+	if org.TagExpirationS != nil {
+		state.TagExpirationS = types.Int64Value(int64(*org.TagExpirationS))
+	}
 }

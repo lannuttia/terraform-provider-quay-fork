@@ -63,7 +63,7 @@ data "quay_organization" "test" {
 `, orgName),
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr("data.quay_organization.test", "name", orgName),
-					resource.TestCheckResourceAttrSet("data.quay_organization.test", "is_organization"),
+					resource.TestCheckResourceAttr("data.quay_organization.test", "email", "tf-acc-ds@example.com"),
 				),
 			},
 		},

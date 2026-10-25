@@ -11,6 +11,12 @@ import (
 	"github.com/quay/terraform-provider-quay/internal/client"
 )
 
+// boolPtr and intPtr are helpers for constructing pointer-typed Organization
+// fields in test literals.
+func boolPtr(b bool) *bool    { return &b }
+func intPtr(i int) *int       { return &i }
+func strPtr(s string) *string { return &s }
+
 // TestOrganization_MarshalZeroValues ensures that zero/false values on the
 // Organization response struct are preserved when the struct is marshalled to
 // JSON. Fields tagged with omitempty silently drop false booleans, empty
@@ -20,11 +26,10 @@ func TestOrganization_MarshalZeroValues(t *testing.T) {
 	org := client.Organization{
 		Name:                "myorg",
 		Email:               "",
-		InvoiceEmail:        false,
-		InvoiceEmailAddress: "",
-		TagExpirationS:      0,
-		IsOrganization:      false,
-		IsFreeAccount:       false,
+		InvoiceEmail:        boolPtr(false),
+		InvoiceEmailAddress: strPtr(""),
+		TagExpirationS:      intPtr(0),
+		IsFreeAccount:       boolPtr(false),
 	}
 
 	data, err := json.Marshal(org)
@@ -37,11 +42,11 @@ func TestOrganization_MarshalZeroValues(t *testing.T) {
 		t.Fatalf("unexpected unmarshal error: %v", err)
 	}
 
+	// Pointer fields with non-nil values must appear in the JSON output.
 	requiredKeys := []string{
 		"invoice_email",
 		"invoice_email_address",
 		"tag_expiration_s",
-		"is_organization",
 		"is_free_account",
 	}
 	for _, key := range requiredKeys {
@@ -148,7 +153,7 @@ func TestUpdateOrganization_InvoiceEmailFalse(t *testing.T) {
 			_ = json.Unmarshal(b, &gotBody)
 			writeJSON(w, http.StatusOK, map[string]string{})
 		case http.MethodGet:
-			writeJSON(w, http.StatusOK, client.Organization{Name: "myorg", InvoiceEmail: false})
+			writeJSON(w, http.StatusOK, client.Organization{Name: "myorg", InvoiceEmail: boolPtr(false)})
 		}
 	})
 
@@ -218,7 +223,7 @@ func TestUpdateOrganization_InvoiceEmailAddressEmpty(t *testing.T) {
 			_ = json.Unmarshal(b, &gotBody)
 			writeJSON(w, http.StatusOK, map[string]string{})
 		case http.MethodGet:
-			writeJSON(w, http.StatusOK, client.Organization{Name: "myorg", InvoiceEmailAddress: ""})
+			writeJSON(w, http.StatusOK, client.Organization{Name: "myorg", InvoiceEmailAddress: strPtr("")})
 		}
 	})
 
@@ -251,7 +256,7 @@ func TestUpdateOrganization_TagExpirationZero(t *testing.T) {
 			_ = json.Unmarshal(b, &gotBody)
 			writeJSON(w, http.StatusOK, map[string]string{})
 		case http.MethodGet:
-			writeJSON(w, http.StatusOK, client.Organization{Name: "myorg", TagExpirationS: 0})
+			writeJSON(w, http.StatusOK, client.Organization{Name: "myorg", TagExpirationS: intPtr(0)})
 		}
 	})
 

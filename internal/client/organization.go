@@ -6,14 +6,18 @@ import (
 )
 
 // Organization represents a Quay organization.
+//
+// InvoiceEmail, InvoiceEmailAddress, TagExpirationS and IsFreeAccount are
+// admin-only fields that Quay omits from the response for non-admin tokens.
+// Pointer types allow callers to distinguish "field absent" from "field present
+// with a zero value".
 type Organization struct {
-	Name                string `json:"name"`
-	Email               string `json:"email"`
-	InvoiceEmail        bool   `json:"invoice_email"`
-	InvoiceEmailAddress string `json:"invoice_email_address"`
-	TagExpirationS      int    `json:"tag_expiration_s"`
-	IsOrganization      bool   `json:"is_organization"`
-	IsFreeAccount       bool   `json:"is_free_account"`
+	Name                string  `json:"name"`
+	Email               string  `json:"email"`
+	InvoiceEmail        *bool   `json:"invoice_email"`
+	InvoiceEmailAddress *string `json:"invoice_email_address"`
+	TagExpirationS      *int    `json:"tag_expiration_s"`
+	IsFreeAccount       *bool   `json:"is_free_account"`
 }
 
 type CreateOrganizationRequest struct {

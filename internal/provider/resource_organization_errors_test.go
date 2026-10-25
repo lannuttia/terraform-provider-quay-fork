@@ -6,7 +6,10 @@ import (
 	"regexp"
 	"testing"
 
+	fwdatasource "github.com/hashicorp/terraform-plugin-framework/datasource"
+	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
+	"github.com/quay/terraform-provider-quay/internal/provider"
 )
 
 // TestAccOrganization_TagExpirationSInvalidValueRejected verifies that a
@@ -29,6 +32,59 @@ resource "quay_organization" "test" {
 			},
 		},
 	})
+}
+
+// orgDataSourceSchema returns the schema of the quay_organization data source.
+func orgDataSourceSchema(t *testing.T) schema.Schema {
+	t.Helper()
+	ds := provider.NewOrganizationDataSource()
+	var resp fwdatasource.SchemaResponse
+	ds.Schema(context.Background(), fwdatasource.SchemaRequest{}, &resp)
+	return resp.Schema
+}
+
+// TestOrgDataSource_IsOrganizationDropped verifies that is_organization is not
+// present in the data source schema. Quay never returns this field in the GET
+// response, so it always reads as false — a misleading constant that adds no
+// information.
+func TestOrgDataSource_IsOrganizationDropped(t *testing.T) {
+	s := orgDataSourceSchema(t)
+	if _, ok := s.Attributes["is_organization"]; ok {
+		t.Error("is_organization should be removed from the org data source schema — " +
+			"Quay never returns this field, so it is always false")
+	}
+}
+
+// TestOrgDataSource_AdminFieldsAreNullable verifies that admin-only fields in
+// the org data source use nullable types. These fields are absent from the API
+// response for non-admin tokens, so they must be null rather than zero values
+// to allow callers to distinguish "not returned" from "set to zero".
+func TestOrgDataSource_AdminFieldsAreNullable(t *testing.T) {
+	s := orgDataSourceSchema(t)
+
+	for _, field := range []string{"invoice_email", "invoice_email_address", "tag_expiration_s", "is_free_account"} {
+		attr, ok := s.Attributes[field]
+		if !ok {
+			t.Errorf("expected attribute %q to exist in org data source schema", field)
+			continue
+		}
+		// Nullable attributes must not be Required — they need to tolerate
+		// absence from the API response.
+		switch a := attr.(type) {
+		case schema.BoolAttribute:
+			if !a.Optional && !a.Computed {
+				t.Errorf("attribute %q must be Optional or Computed to support null values", field)
+			}
+		case schema.StringAttribute:
+			if !a.Optional && !a.Computed {
+				t.Errorf("attribute %q must be Optional or Computed to support null values", field)
+			}
+		case schema.Int64Attribute:
+			if !a.Optional && !a.Computed {
+				t.Errorf("attribute %q must be Optional or Computed to support null values", field)
+			}
+		}
+	}
 }
 
 func TestAccOrganization_DuplicateName(t *testing.T) {

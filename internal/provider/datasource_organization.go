@@ -22,7 +22,6 @@ type OrganizationDataSourceModel struct {
 	InvoiceEmail        types.Bool   `tfsdk:"invoice_email"`
 	InvoiceEmailAddress types.String `tfsdk:"invoice_email_address"`
 	TagExpirationS      types.Int64  `tfsdk:"tag_expiration_s"`
-	IsOrganization      types.Bool   `tfsdk:"is_organization"`
 	IsFreeAccount       types.Bool   `tfsdk:"is_free_account"`
 }
 
@@ -57,10 +56,6 @@ func (d *OrganizationDataSource) Schema(_ context.Context, _ datasource.SchemaRe
 			"tag_expiration_s": schema.Int64Attribute{
 				Computed:    true,
 				Description: "The default tag expiration in seconds.",
-			},
-			"is_organization": schema.BoolAttribute{
-				Computed:    true,
-				Description: "Whether this namespace is an organization (vs. a user namespace).",
 			},
 			"is_free_account": schema.BoolAttribute{
 				Computed:    true,
@@ -97,11 +92,26 @@ func (d *OrganizationDataSource) Read(ctx context.Context, req datasource.ReadRe
 
 	state.Name = types.StringValue(org.Name)
 	state.Email = types.StringValue(org.Email)
-	state.InvoiceEmail = types.BoolValue(org.InvoiceEmail)
-	state.InvoiceEmailAddress = types.StringValue(org.InvoiceEmailAddress)
-	state.TagExpirationS = types.Int64Value(int64(org.TagExpirationS))
-	state.IsOrganization = types.BoolValue(org.IsOrganization)
-	state.IsFreeAccount = types.BoolValue(org.IsFreeAccount)
+	if org.InvoiceEmail != nil {
+		state.InvoiceEmail = types.BoolValue(*org.InvoiceEmail)
+	} else {
+		state.InvoiceEmail = types.BoolNull()
+	}
+	if org.InvoiceEmailAddress != nil {
+		state.InvoiceEmailAddress = types.StringValue(*org.InvoiceEmailAddress)
+	} else {
+		state.InvoiceEmailAddress = types.StringNull()
+	}
+	if org.TagExpirationS != nil {
+		state.TagExpirationS = types.Int64Value(int64(*org.TagExpirationS))
+	} else {
+		state.TagExpirationS = types.Int64Null()
+	}
+	if org.IsFreeAccount != nil {
+		state.IsFreeAccount = types.BoolValue(*org.IsFreeAccount)
+	} else {
+		state.IsFreeAccount = types.BoolNull()
+	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
