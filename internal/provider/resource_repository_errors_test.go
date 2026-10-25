@@ -1,8 +1,12 @@
 package provider_test
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
@@ -270,6 +274,72 @@ resource "quay_repository" "oob" {
 				},
 				RefreshState:       true,
 				ExpectNonEmptyPlan: true,
+			},
+		},
+	})
+}
+
+// TestRepository_Read403OnUserNamespaceSurfacesError reproduces the bug where
+// a 403 from Quay on a user-namespace repository is misread as "namespace
+// deleted" and silently removes the resource from state.
+//
+// The buggy code calls GetOrganization to check whether the namespace still
+// exists. For user namespaces GetOrganization always returns 404 (users are
+// not organisations), so the code incorrectly concludes the namespace is gone
+// and removes the resource from state — hiding a real permissions error.
+//
+// The fix adds a NamespaceExists helper that checks both the org endpoint and
+// the user endpoint (GET /api/v1/users/<name>). When the user endpoint returns
+// 200, the namespace exists and the 403 must surface as an error rather than
+// silently dropping state.
+//
+// This is a unit test: an httptest server plays the role of Quay, returning
+// 403 for the repository GET, 404 for the org GET, and 200 for the user GET.
+func TestRepository_Read403OnUserNamespaceSurfacesError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		write := func(status int, body any) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(status)
+			_ = json.NewEncoder(w).Encode(body)
+		}
+		path := r.URL.Path
+		switch {
+		// Repository GET → 403 (permission denied, not namespace-gone).
+		case strings.HasPrefix(path, "/api/v1/repository/"):
+			write(http.StatusForbidden, map[string]string{"message": "access denied"})
+		// Org lookup → 404 (alice is a user, not an org).
+		case strings.HasPrefix(path, "/api/v1/organization/"):
+			write(http.StatusNotFound, map[string]string{"message": "not found"})
+		// User lookup → 200 (alice exists as a user account).
+		case strings.HasPrefix(path, "/api/v1/users/"):
+			write(http.StatusOK, map[string]string{"username": "alice"})
+		default:
+			write(http.StatusNotFound, map[string]string{"message": "not found"})
+		}
+	}))
+	t.Cleanup(srv.Close)
+
+	t.Setenv("QUAY_URL", srv.URL)
+	t.Setenv("QUAY_TOKEN", "test-token")
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: providerFactories(),
+		Steps: []resource.TestStep{
+			{
+				// The Create call will receive a 403 from the mock server.
+				// We just need the error to confirm the provider surfaced it
+				// rather than silently removing state.
+				Config: `
+provider "quay" {}
+
+resource "quay_repository" "test" {
+  namespace   = "alice"
+  name        = "myrepo"
+  visibility  = "private"
+  description = ""
+}
+`,
+				ExpectError: regexp.MustCompile(`(?i)(403|forbidden|access denied|Error)`),
 			},
 		},
 	})

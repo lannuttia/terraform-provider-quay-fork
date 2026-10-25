@@ -115,6 +115,38 @@ func (c *Client) HasRepositoryTags(ctx context.Context, repository string) (bool
 	return len(resp.Tags) > 0, nil
 }
 
+// NamespaceExists reports whether the given namespace exists as either a Quay
+// organisation or a Quay user account. It returns (true, nil) when either
+// GET /organization/<name> or GET /users/<name> succeeds (200). It returns
+// (false, nil) when both return 404. Any other error is returned as-is.
+//
+// This is used by Read to disambiguate a 403 on a repository: a 403 from a
+// user-namespace repository is a genuine permissions error (the namespace
+// still exists), whereas a 403 from a repo whose org namespace has been
+// deleted out-of-band means the resource is gone. Checking only the org
+// endpoint misclassifies user-namespace repositories as gone.
+func (c *Client) NamespaceExists(ctx context.Context, name string) (bool, error) {
+	// Check organisation namespace first.
+	err := c.get(ctx, fmt.Sprintf("organization/%s", name), nil)
+	if err == nil {
+		return true, nil
+	}
+	if !IsNotFound(err) {
+		return false, err
+	}
+
+	// Fall through to user namespace.
+	err = c.get(ctx, fmt.Sprintf("users/%s", name), nil)
+	if err == nil {
+		return true, nil
+	}
+	if !IsNotFound(err) {
+		return false, err
+	}
+
+	return false, nil
+}
+
 // repoListResponse is the shape of GET repository?namespace=<name>.
 type repoListResponse struct {
 	Repositories []map[string]any `json:"repositories"`

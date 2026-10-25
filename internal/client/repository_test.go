@@ -261,6 +261,68 @@ func TestHasOrganizationRepositories_NotFound(t *testing.T) {
 	}
 }
 
+// ----- NamespaceExists ---------------------------------------------------
+
+// TestNamespaceExists_OrgNamespace verifies that NamespaceExists returns true
+// when the namespace belongs to an organisation (GET /organization/<name> → 200).
+func TestNamespaceExists_OrgNamespace(t *testing.T) {
+	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/api/v1/organization/"):
+			writeJSON(w, http.StatusOK, map[string]string{"name": "myorg"})
+		default:
+			writeJSON(w, http.StatusNotFound, map[string]string{"message": "not found"})
+		}
+	})
+	exists, err := c.NamespaceExists(context.Background(), "myorg")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !exists {
+		t.Error("expected NamespaceExists=true for an org namespace, got false")
+	}
+}
+
+// TestNamespaceExists_UserNamespace verifies that NamespaceExists returns true
+// when the namespace belongs to a user account (GET /organization/<name> → 404,
+// GET /users/<name> → 200). This is the key case the original code mishandled:
+// it only checked the org endpoint, so user namespaces always looked absent.
+func TestNamespaceExists_UserNamespace(t *testing.T) {
+	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/api/v1/organization/"):
+			// User namespaces are not organisations.
+			writeJSON(w, http.StatusNotFound, map[string]string{"message": "not found"})
+		case strings.HasPrefix(r.URL.Path, "/api/v1/users/"):
+			writeJSON(w, http.StatusOK, map[string]string{"username": "alice"})
+		default:
+			writeJSON(w, http.StatusNotFound, map[string]string{"message": "not found"})
+		}
+	})
+	exists, err := c.NamespaceExists(context.Background(), "alice")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !exists {
+		t.Error("expected NamespaceExists=true for a user namespace, got false")
+	}
+}
+
+// TestNamespaceExists_Absent verifies that NamespaceExists returns false when
+// both the org and user endpoints return 404 — i.e. the namespace is truly gone.
+func TestNamespaceExists_Absent(t *testing.T) {
+	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusNotFound, map[string]string{"message": "not found"})
+	})
+	exists, err := c.NamespaceExists(context.Background(), "vanished")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if exists {
+		t.Error("expected NamespaceExists=false for an absent namespace, got true")
+	}
+}
+
 func TestHasOrganizationRepositories_QueryStringNotEscaped(t *testing.T) {
 	var gotRawQuery string
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {

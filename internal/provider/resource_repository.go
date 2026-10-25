@@ -128,11 +128,16 @@ func (r *RepositoryResource) Read(ctx context.Context, req resource.ReadRequest,
 			return
 		}
 		// Quay returns 403 (not 404) when a repo's namespace has been deleted
-		// out-of-band. Only remove from state if the namespace is also gone;
-		// otherwise the 403 is a genuine permission error.
+		// out-of-band. Only remove from state if the namespace is truly gone;
+		// otherwise the 403 is a genuine permission error and must surface.
+		// NamespaceExists checks both the org and user endpoints so that
+		// repositories owned by user accounts are handled correctly —
+		// GetOrganization alone always returns 404 for user namespaces,
+		// which would incorrectly make every user-namespace 403 look like a
+		// deleted namespace.
 		if client.IsForbidden(err) {
-			_, nsErr := r.client.GetOrganization(ctx, state.Namespace.ValueString())
-			if client.IsNotFound(nsErr) {
+			exists, nsErr := r.client.NamespaceExists(ctx, state.Namespace.ValueString())
+			if nsErr == nil && !exists {
 				resp.State.RemoveResource(ctx)
 				return
 			}
