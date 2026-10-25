@@ -43,15 +43,16 @@ type ChangeVisibilityRequest struct {
 }
 
 func (c *Client) CreateRepository(ctx context.Context, req CreateRepositoryRequest) (*Repository, error) {
-	var repo Repository
-	if err := c.post(ctx, "repository", req, &repo); err != nil {
+	if err := c.post(ctx, "repository", req, nil); err != nil {
 		return nil, fmt.Errorf("creating repository %q: %w", req.Repository, err)
 	}
-	// Quay omits description from the POST response; backfill from the request.
-	if repo.Description == "" && req.Description != "" {
-		repo.Description = req.Description
+	// Quay's POST response omits is_public, so a GET is required to read back
+	// the actual visibility rather than always seeing false.
+	repo, err := c.GetRepository(ctx, fmt.Sprintf("%s/%s", req.Namespace, req.Repository))
+	if err != nil {
+		return nil, fmt.Errorf("repository %q was already created but could not be read back: %w", req.Repository, err)
 	}
-	return &repo, nil
+	return repo, nil
 }
 
 func (c *Client) GetRepository(ctx context.Context, repository string) (*Repository, error) {

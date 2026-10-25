@@ -117,6 +117,42 @@ data "quay_repository" "test" {
 	})
 }
 
+// TestAccRepository_CreatePublic verifies that creating a repository with
+// visibility = "public" is reflected correctly in state. Quay's POST
+// /repository response omits is_public, so the provider must issue a GET
+// after create to obtain the actual visibility rather than relying on the
+// POST response body.
+func TestAccRepository_CreatePublic(t *testing.T) {
+	skipIfNoAcc(t)
+	orgName := rname("tf-acc-pub-repo-org")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: providerFactories(),
+		CheckDestroy: resource.ComposeTestCheckFunc(
+			checkOrganizationDestroyed(orgName),
+			checkRepositoryDestroyed(orgName+"/pub-repo"),
+		),
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig() + fmt.Sprintf(`
+resource "quay_organization" "test" {
+  name  = %q
+  email = "tf-acc-pub-repo@example.com"
+}
+resource "quay_repository" "test" {
+  namespace  = quay_organization.test.name
+  name       = "pub-repo"
+  visibility = "public"
+}
+`, orgName),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("quay_repository.test", "visibility", "public"),
+				),
+			},
+		},
+	})
+}
+
 func TestAccRepository_DeleteNonEmpty(t *testing.T) {
 	skipIfNoAcc(t)
 	orgName := rname("tf-acc-nodel-repo-org")

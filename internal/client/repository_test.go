@@ -15,7 +15,13 @@ func TestCreateRepository(t *testing.T) {
 		switch {
 		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/repository"):
 			created = true
-			writeJSON(w, http.StatusCreated, client.Repository{
+			writeJSON(w, http.StatusCreated, map[string]string{
+				"namespace": "myorg",
+				"name":      "myrepo",
+				"kind":      "image",
+			})
+		case r.Method == http.MethodGet:
+			writeJSON(w, http.StatusOK, client.Repository{
 				Namespace: "myorg",
 				Name:      "myrepo",
 				IsPublic:  false,
@@ -266,53 +272,5 @@ func TestHasOrganizationRepositories_QueryStringNotEscaped(t *testing.T) {
 
 	if !strings.Contains(gotRawQuery, "namespace=myorg") {
 		t.Errorf("want raw query to contain 'namespace=myorg', got %q", gotRawQuery)
-	}
-}
-
-// TestCreateRepository_UsesPostResponseBody verifies that CreateRepository
-// uses the repository data returned directly in the POST response body rather
-// than making a second GET request. The Quay POST /repository endpoint returns
-// the full repository object in the 201 response, so the follow-up GET is
-// unnecessary. Eliminating it removes a failure window where the resource is
-// created but the GET fails, causing Terraform to surface an error and leave
-// the repository orphaned with no state entry — making every subsequent apply
-// fail with a 409 conflict.
-func TestCreateRepository_UsesPostResponseBody(t *testing.T) {
-	getCalled := false
-	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/repository"):
-			writeJSON(w, http.StatusCreated, client.Repository{
-				Namespace: "myorg",
-				Name:      "myrepo",
-				IsPublic:  false,
-			})
-		case r.Method == http.MethodGet:
-			getCalled = true
-			// Return a different name so the test can tell which response was used.
-			writeJSON(w, http.StatusOK, client.Repository{
-				Namespace: "myorg",
-				Name:      "from-get",
-				IsPublic:  true,
-			})
-		default:
-			http.NotFound(w, r)
-		}
-	})
-
-	repo, err := c.CreateRepository(context.Background(), client.CreateRepositoryRequest{
-		Repository:  "myrepo",
-		Namespace:   "myorg",
-		Visibility:  "private",
-		Description: "test",
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if getCalled {
-		t.Error("CreateRepository made an unnecessary GET request after POST; it should use the POST response body directly")
-	}
-	if repo.Name != "myrepo" {
-		t.Errorf("expected name from POST response %q, got %q", "myrepo", repo.Name)
 	}
 }
