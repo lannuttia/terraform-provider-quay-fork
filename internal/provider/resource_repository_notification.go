@@ -39,8 +39,6 @@ type RepositoryNotificationResourceModel struct {
 	Webhook          *WebhookConfig          `tfsdk:"webhook"`
 	Slack            *SlackConfig            `tfsdk:"slack"`
 	Email            *EmailConfig            `tfsdk:"email"`
-	Hipchat          *HipchatConfig          `tfsdk:"hipchat"`
-	Flowdock         *FlowdockConfig         `tfsdk:"flowdock"`
 	QuayNotification *QuayNotificationConfig `tfsdk:"quay_notification"`
 
 	RepoPush              *RepoPushEvent              `tfsdk:"repo_push"`
@@ -66,15 +64,6 @@ type SlackConfig struct {
 
 type EmailConfig struct {
 	Email types.String `tfsdk:"email"`
-}
-
-type HipchatConfig struct {
-	NotificationToken types.String `tfsdk:"notification_token"`
-	RoomID            types.String `tfsdk:"room_id"`
-}
-
-type FlowdockConfig struct {
-	FlowAPIToken types.String `tfsdk:"flow_api_token"`
 }
 
 // QuayNotificationTarget identifies the Quay user or team to receive an
@@ -135,7 +124,7 @@ func (r *RepositoryNotificationResource) Schema(_ context.Context, _ resource.Sc
 		Description: "Manages a notification on a Quay repository. " +
 			"Because the Quay API has no update endpoint for notifications, any change to notification " +
 			"attributes will cause the existing notification to be deleted and a new one created. " +
-			"Exactly one method block (webhook, slack, email, hipchat, flowdock, or quay_notification) " +
+			"Exactly one method block (webhook, slack, email, or quay_notification) " +
 			"must be provided. Exactly one event block must be provided; event-specific configuration " +
 			"(such as the vulnerability severity level or a build ref regex) lives inside that block.",
 		Attributes: map[string]schema.Attribute{
@@ -211,37 +200,6 @@ func (r *RepositoryNotificationResource) Schema(_ context.Context, _ resource.Sc
 					"email": schema.StringAttribute{
 						Required:      true,
 						Description:   "The recipient email address.",
-						PlanModifiers: requiresReplaceStr,
-					},
-				},
-			},
-			"hipchat": schema.SingleNestedAttribute{
-				Optional:      true,
-				Description:   "Deliver notifications to a HipChat room.",
-				PlanModifiers: requiresReplaceObj,
-				Attributes: map[string]schema.Attribute{
-					"notification_token": schema.StringAttribute{
-						Required:      true,
-						Sensitive:     true,
-						Description:   "The HipChat API notification token.",
-						PlanModifiers: requiresReplaceStr,
-					},
-					"room_id": schema.StringAttribute{
-						Required:      true,
-						Description:   "The HipChat room ID.",
-						PlanModifiers: requiresReplaceStr,
-					},
-				},
-			},
-			"flowdock": schema.SingleNestedAttribute{
-				Optional:      true,
-				Description:   "Deliver notifications to a Flowdock flow.",
-				PlanModifiers: requiresReplaceObj,
-				Attributes: map[string]schema.Attribute{
-					"flow_api_token": schema.StringAttribute{
-						Required:      true,
-						Sensitive:     true,
-						Description:   "The Flowdock flow API token.",
 						PlanModifiers: requiresReplaceStr,
 					},
 				},
@@ -370,8 +328,6 @@ func (r *RepositoryNotificationResource) ConfigValidators(_ context.Context) []r
 			path.MatchRoot("webhook"),
 			path.MatchRoot("slack"),
 			path.MatchRoot("email"),
-			path.MatchRoot("hipchat"),
-			path.MatchRoot("flowdock"),
 			path.MatchRoot("quay_notification"),
 		),
 		resourcevalidator.ExactlyOneOf(
@@ -513,13 +469,6 @@ func (m *RepositoryNotificationResourceModel) methodAndConfig() (string, map[str
 		return "slack", map[string]any{"url": m.Slack.URL.ValueString()}
 	case m.Email != nil:
 		return "email", map[string]any{"email": m.Email.Email.ValueString()}
-	case m.Hipchat != nil:
-		return "hipchat", map[string]any{
-			"notification_token": m.Hipchat.NotificationToken.ValueString(),
-			"room_id":            m.Hipchat.RoomID.ValueString(),
-		}
-	case m.Flowdock != nil:
-		return "flowdock", map[string]any{"flow_api_token": m.Flowdock.FlowAPIToken.ValueString()}
 	case m.QuayNotification != nil:
 		return "quay_notification", map[string]any{
 			"target": map[string]any{
@@ -596,8 +545,6 @@ func (r *RepositoryNotificationResource) mapToState(notif *client.Notification, 
 	state.Webhook = nil
 	state.Slack = nil
 	state.Email = nil
-	state.Hipchat = nil
-	state.Flowdock = nil
 	state.QuayNotification = nil
 
 	switch notif.Method {
@@ -607,13 +554,6 @@ func (r *RepositoryNotificationResource) mapToState(notif *client.Notification, 
 		state.Slack = &SlackConfig{URL: types.StringValue(stringFromConfig(notif.Config, "url"))}
 	case "email":
 		state.Email = &EmailConfig{Email: types.StringValue(stringFromConfig(notif.Config, "email"))}
-	case "hipchat":
-		state.Hipchat = &HipchatConfig{
-			NotificationToken: types.StringValue(stringFromConfig(notif.Config, "notification_token")),
-			RoomID:            types.StringValue(stringFromConfig(notif.Config, "room_id")),
-		}
-	case "flowdock":
-		state.Flowdock = &FlowdockConfig{FlowAPIToken: types.StringValue(stringFromConfig(notif.Config, "flow_api_token"))}
 	case "quay_notification":
 		target, _ := notif.Config["target"].(map[string]any)
 		kind := ""

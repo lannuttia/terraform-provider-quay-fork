@@ -103,11 +103,6 @@ func (c *Client) withRetryDelay(f func(attempt int) time.Duration) *Client {
 	return &copy
 }
 
-// BaseURL returns the base URL this client is configured to talk to.
-func (c *Client) BaseURL() string {
-	return c.baseURL
-}
-
 // APIError represents an error response from the Quay API.
 type APIError struct {
 	StatusCode int

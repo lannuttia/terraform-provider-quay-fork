@@ -3,12 +3,12 @@
 page_title: "quay_repository_notification Resource - quay"
 subcategory: ""
 description: |-
-  Manages a notification on a Quay repository. Because the Quay API has no update endpoint for notifications, any change to notification attributes will cause the existing notification to be deleted and a new one created. Exactly one method block (webhook, slack, email, hipchat, flowdock, or quay_notification) must be provided. Exactly one event block must be provided; event-specific configuration (such as the vulnerability severity level or a build ref regex) lives inside that block.
+  Manages a notification on a Quay repository. Because the Quay API has no update endpoint for notifications, any change to notification attributes will cause the existing notification to be deleted and a new one created. Exactly one method block (webhook, slack, email, or quay_notification) must be provided. Exactly one event block must be provided; event-specific configuration (such as the vulnerability severity level or a build ref regex) lives inside that block.
 ---
 
 # quay_repository_notification (Resource)
 
-Manages a notification on a Quay repository. Because the Quay API has no update endpoint for notifications, any change to notification attributes will cause the existing notification to be deleted and a new one created. Exactly one method block (webhook, slack, email, hipchat, flowdock, or quay_notification) must be provided. Exactly one event block must be provided; event-specific configuration (such as the vulnerability severity level or a build ref regex) lives inside that block.
+Manages a notification on a Quay repository. Because the Quay API has no update endpoint for notifications, any change to notification attributes will cause the existing notification to be deleted and a new one created. Exactly one method block (webhook, slack, email, or quay_notification) must be provided. Exactly one event block must be provided; event-specific configuration (such as the vulnerability severity level or a build ref regex) lives inside that block.
 
 ## Example Usage
 
@@ -77,8 +77,6 @@ resource "quay_repository_notification" "main_build_email" {
 - `build_start` (Attributes) Trigger when a build starts. (see [below for nested schema](#nestedatt--build_start))
 - `build_success` (Attributes) Trigger when a build succeeds. (see [below for nested schema](#nestedatt--build_success))
 - `email` (Attributes) Deliver notifications by email. The address must already be authorized and confirmed for the repository in the Quay UI before this resource is created; Quay rejects unverified addresses with 400 "not authorized to receive notifications" and the provider cannot run the confirmation flow. (see [below for nested schema](#nestedatt--email))
-- `flowdock` (Attributes) Deliver notifications to a Flowdock flow. (see [below for nested schema](#nestedatt--flowdock))
-- `hipchat` (Attributes) Deliver notifications to a HipChat room. (see [below for nested schema](#nestedatt--hipchat))
 - `quay_notification` (Attributes) Deliver notifications as in-app alerts in the Quay web UI to a specific user or team. The recipient must be a member of the repository's namespace. (see [below for nested schema](#nestedatt--quay_notification))
 - `repo_image_expiry` (Attributes) Trigger when an image in the repository is due to expire. (see [below for nested schema](#nestedatt--repo_image_expiry))
 - `repo_mirror_sync_failed` (Attributes) Trigger when a repository mirror sync fails. (see [below for nested schema](#nestedatt--repo_mirror_sync_failed))
@@ -142,23 +140,6 @@ Optional:
 Required:
 
 - `email` (String) The recipient email address.
-
-
-<a id="nestedatt--flowdock"></a>
-### Nested Schema for `flowdock`
-
-Required:
-
-- `flow_api_token` (String, Sensitive) The Flowdock flow API token.
-
-
-<a id="nestedatt--hipchat"></a>
-### Nested Schema for `hipchat`
-
-Required:
-
-- `notification_token` (String, Sensitive) The HipChat API notification token.
-- `room_id` (String) The HipChat room ID.
 
 
 <a id="nestedatt--quay_notification"></a>

@@ -23,7 +23,6 @@ type Repository struct {
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
 	IsPublic    bool   `json:"is_public"`
-	Kind        string `json:"kind,omitempty"`
 }
 
 type CreateRepositoryRequest struct {
@@ -31,7 +30,6 @@ type CreateRepositoryRequest struct {
 	Namespace   string `json:"namespace,omitempty"`
 	Visibility  string `json:"visibility"`
 	Description string `json:"description"`
-	RepoKind    string `json:"repo_kind,omitempty"`
 }
 
 type UpdateRepositoryRequest struct {

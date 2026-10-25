@@ -100,9 +100,8 @@ func TestNotificationSchema_QuayNotificationTarget(t *testing.T) {
 // redacts them in plan/apply output and encrypts them in state.
 //
 // A Slack incoming-webhook URL is the credential itself; webhook URLs frequently
-// embed tokens; HipChat notification_token and Flowdock flow_api_token are
-// explicit API secrets. Without Sensitive: true these values appear in every
-// plan diff and CI log.
+// embed tokens. Without Sensitive: true these values appear in every plan diff
+// and CI log.
 func TestNotificationSchema_SensitiveFields(t *testing.T) {
 	s := schemaFor(t, provider.NewRepositoryNotificationResource)
 
@@ -111,8 +110,6 @@ func TestNotificationSchema_SensitiveFields(t *testing.T) {
 	}{
 		{[]string{"webhook", "url"}},
 		{[]string{"slack", "url"}},
-		{[]string{"hipchat", "notification_token"}},
-		{[]string{"flowdock", "flow_api_token"}},
 	}
 
 	for _, tc := range cases {
