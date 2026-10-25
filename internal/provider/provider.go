@@ -118,10 +118,25 @@ func (p *QuayProvider) Configure(ctx context.Context, req provider.ConfigureRequ
 			)
 			return
 		}
+		if secs < 0 {
+			resp.Diagnostics.AddError(
+				"Invalid QUAY_TIMEOUT",
+				fmt.Sprintf("QUAY_TIMEOUT must be a non-negative integer; got %d. Use 0 to disable the timeout.", secs),
+			)
+			return
+		}
 		timeout = time.Duration(secs) * time.Second
 	}
 	if !config.Timeout.IsNull() && !config.Timeout.IsUnknown() {
-		timeout = time.Duration(config.Timeout.ValueInt64()) * time.Second
+		secs := config.Timeout.ValueInt64()
+		if secs < 0 {
+			resp.Diagnostics.AddError(
+				"Invalid Timeout",
+				fmt.Sprintf("The `timeout` provider attribute must be a non-negative integer; got %d. Use 0 to disable the timeout.", secs),
+			)
+			return
+		}
+		timeout = time.Duration(secs) * time.Second
 	}
 
 	c := client.New(url, token, timeout)

@@ -163,6 +163,60 @@ data "quay_repository" "test" {
 	})
 }
 
+// TestProvider_NegativeTimeoutInConfig verifies that a negative timeout value
+// supplied in the provider block is rejected at configure time. A negative
+// time.Duration passed to http.Client.Timeout is treated as no timeout, which
+// silently ignores the user's intent instead of surfacing an error.
+func TestProvider_NegativeTimeoutInConfig(t *testing.T) {
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: providerFactories(),
+		Steps: []resource.TestStep{
+			{
+				Config: `
+provider "quay" {
+  url     = "https://quay.io"
+  token   = "test-token"
+  timeout = -1
+}
+
+data "quay_repository" "test" {
+  namespace = "myorg"
+  name      = "myrepo"
+}
+`,
+				ExpectError: regexp.MustCompile(`(?i)(negative|invalid.*timeout|timeout.*invalid)`),
+			},
+		},
+	})
+}
+
+// TestProvider_NegativeTimeoutInEnv verifies that a negative value in the
+// QUAY_TIMEOUT environment variable is rejected at configure time with a clear
+// error. The same silent-no-timeout behaviour applies as for the config path.
+func TestProvider_NegativeTimeoutInEnv(t *testing.T) {
+	t.Setenv("QUAY_TIMEOUT", "-1")
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: providerFactories(),
+		Steps: []resource.TestStep{
+			{
+				Config: `
+provider "quay" {
+  url   = "https://quay.io"
+  token = "test-token"
+}
+
+data "quay_repository" "test" {
+  namespace = "myorg"
+  name      = "myrepo"
+}
+`,
+				ExpectError: regexp.MustCompile(`(?i)(negative|invalid.*timeout|timeout.*invalid)`),
+			},
+		},
+	})
+}
+
 // TestProvider_MissingToken verifies the provider returns a clear error when
 // no token is supplied (neither in config nor environment).
 func TestProvider_MissingToken(t *testing.T) {
