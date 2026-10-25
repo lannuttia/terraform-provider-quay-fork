@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/resourcevalidator"
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
@@ -29,7 +30,8 @@ type RepositoryNotificationResource struct {
 
 type RepositoryNotificationResourceModel struct {
 	ID               types.String `tfsdk:"id"`
-	Repository       types.String `tfsdk:"repository"`
+	Namespace        types.String `tfsdk:"namespace"`
+	Name             types.String `tfsdk:"name"`
 	UUID             types.String `tfsdk:"uuid"`
 	Title            types.String `tfsdk:"title"`
 	NumberOfFailures types.Int64  `tfsdk:"number_of_failures"`
@@ -144,9 +146,14 @@ func (r *RepositoryNotificationResource) Schema(_ context.Context, _ resource.Sc
 					stringplanmodifier.UseStateForUnknown(),
 				},
 			},
-			"repository": schema.StringAttribute{
+			"namespace": schema.StringAttribute{
 				Required:      true,
-				Description:   "The repository this notification belongs to, in namespace/name format.",
+				Description:   "The namespace (organization or username) that owns the repository.",
+				PlanModifiers: requiresReplaceStr,
+			},
+			"name": schema.StringAttribute{
+				Required:      true,
+				Description:   "The name of the repository.",
 				PlanModifiers: requiresReplaceStr,
 			},
 			"uuid": schema.StringAttribute{
@@ -405,7 +412,8 @@ func (r *RepositoryNotificationResource) Create(ctx context.Context, req resourc
 	method, methodConfig := plan.methodAndConfig()
 	event, eventConfig := plan.eventAndConfig()
 
-	notif, err := r.client.CreateRepoNotification(ctx, plan.Repository.ValueString(), client.CreateNotificationRequest{
+	repoPath := plan.Namespace.ValueString() + "/" + plan.Name.ValueString()
+	notif, err := r.client.CreateRepoNotification(ctx, repoPath, client.CreateNotificationRequest{
 		Event:       event,
 		Method:      method,
 		Config:      methodConfig,
@@ -417,7 +425,7 @@ func (r *RepositoryNotificationResource) Create(ctx context.Context, req resourc
 		return
 	}
 
-	resp.Diagnostics.Append(r.mapToState(notif, plan.Repository.ValueString(), &plan)...)
+	resp.Diagnostics.Append(r.mapToState(notif, repoPath, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -431,7 +439,8 @@ func (r *RepositoryNotificationResource) Read(ctx context.Context, req resource.
 		return
 	}
 
-	notif, err := r.client.GetRepoNotification(ctx, state.Repository.ValueString(), state.UUID.ValueString())
+	repoPath := state.Namespace.ValueString() + "/" + state.Name.ValueString()
+	notif, err := r.client.GetRepoNotification(ctx, repoPath, state.UUID.ValueString())
 	if err != nil {
 		if client.IsNotFound(err) {
 			resp.State.RemoveResource(ctx)
@@ -441,7 +450,7 @@ func (r *RepositoryNotificationResource) Read(ctx context.Context, req resource.
 		return
 	}
 
-	resp.Diagnostics.Append(r.mapToState(notif, state.Repository.ValueString(), &state)...)
+	resp.Diagnostics.Append(r.mapToState(notif, repoPath, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -467,7 +476,8 @@ func (r *RepositoryNotificationResource) Delete(ctx context.Context, req resourc
 		return
 	}
 
-	err := r.client.DeleteRepoNotification(ctx, state.Repository.ValueString(), state.UUID.ValueString())
+	repoPath := state.Namespace.ValueString() + "/" + state.Name.ValueString()
+	err := r.client.DeleteRepoNotification(ctx, repoPath, state.UUID.ValueString())
 	if err != nil && !client.IsNotFound(err) {
 		resp.Diagnostics.AddError("Error Deleting Repository Notification", err.Error())
 	}
@@ -479,15 +489,17 @@ func (r *RepositoryNotificationResource) ImportState(ctx context.Context, req re
 	if diags.HasError() {
 		return
 	}
-	repository := parts[0] + "/" + parts[1]
+	namespace := parts[0]
+	repoName := parts[1]
 	uuid := parts[2]
 	setAttrs(ctx, resp, map[string]string{
 		// id is derived from the parsed parts, not passed through verbatim from
-		// req.ID. This guarantees id is always canonical (repository+"/"+uuid)
+		// req.ID. This guarantees id is always canonical (namespace/name/uuid)
 		// and matches the value mapToState computes during Create and Read.
-		"id":         repository + "/" + uuid,
-		"repository": repository,
-		"uuid":       uuid,
+		"id":        namespace + "/" + repoName + "/" + uuid,
+		"namespace": namespace,
+		"name":      repoName,
+		"uuid":      uuid,
 	})
 }
 
@@ -571,7 +583,11 @@ func buildRefRegexConfig(refRegex types.String) map[string]any {
 func (r *RepositoryNotificationResource) mapToState(notif *client.Notification, repository string, state *RepositoryNotificationResourceModel) diag.Diagnostics {
 	var diags diag.Diagnostics
 
-	state.Repository = types.StringValue(repository)
+	parts := strings.SplitN(repository, "/", 2)
+	state.Namespace = types.StringValue(parts[0])
+	if len(parts) == 2 {
+		state.Name = types.StringValue(parts[1])
+	}
 	state.UUID = types.StringValue(notif.UUID)
 	state.Title = types.StringValue(notif.Title)
 	state.NumberOfFailures = types.Int64Value(int64(notif.NumberOfFailures))

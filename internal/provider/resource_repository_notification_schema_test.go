@@ -157,7 +157,9 @@ func TestNotificationSchema_VulnerabilityLevelOmittedAccepted(t *testing.T) {
 			{
 				Config: providerConfig() + `
 resource "quay_repository_notification" "test" {
-  repository          = "myorg/myrepo"
+  namespace  = "myorg"
+
+  name       = "myrepo"
   webhook             = { url = "https://example.com" }
   vulnerability_found = {}
 }
@@ -179,7 +181,9 @@ func TestNotificationSchema_VulnerabilityLevelRejectsInteger(t *testing.T) {
 			{
 				Config: providerConfig() + `
 resource "quay_repository_notification" "bad" {
-  repository          = "myorg/myrepo"
+  namespace  = "myorg"
+
+  name       = "myrepo"
   webhook             = { url = "https://example.com" }
   vulnerability_found = { level = 1 }
 }
@@ -199,7 +203,9 @@ func TestNotificationSchema_VulnerabilityLevelRejectsUnknownString(t *testing.T)
 			{
 				Config: providerConfig() + `
 resource "quay_repository_notification" "bad" {
-  repository          = "myorg/myrepo"
+  namespace  = "myorg"
+
+  name       = "myrepo"
   webhook             = { url = "https://example.com" }
   vulnerability_found = { level = "critical" }
 }
@@ -236,7 +242,9 @@ func TestNotificationSchema_QuayNotificationKindRejectsInvalidValue(t *testing.T
 			{
 				Config: providerConfig() + `
 resource "quay_repository_notification" "bad" {
-  repository        = "myorg/myrepo"
+  namespace  = "myorg"
+
+  name       = "myrepo"
   quay_notification = { target = { kind = "org", name = "myorg" } }
   repo_push         = {}
 }
@@ -258,7 +266,9 @@ func TestNotificationSchema_QuayNotificationKindAcceptsValidValues(t *testing.T)
 					{
 						Config: providerConfig() + `
 resource "quay_repository_notification" "test" {
-  repository        = "myorg/myrepo"
+  namespace  = "myorg"
+
+  name       = "myrepo"
   quay_notification = { target = { kind = "` + kind + `", name = "someone" } }
   repo_push         = {}
 }
@@ -284,7 +294,9 @@ func TestNotificationSchema_VulnerabilityLevelAcceptsValidStrings(t *testing.T) 
 					{
 						Config: providerConfig() + `
 resource "quay_repository_notification" "test" {
-  repository          = "myorg/myrepo"
+  namespace  = "myorg"
+
+  name       = "myrepo"
   webhook             = { url = "https://example.com" }
   vulnerability_found = { level = "` + level + `" }
 }

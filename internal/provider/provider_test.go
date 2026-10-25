@@ -160,7 +160,9 @@ func checkNotificationDestroyed(resourceName string) resource.TestCheckFunc {
 			// Resource was removed from state — nothing to verify.
 			return nil
 		}
-		repository := rs.Primary.Attributes["repository"]
+		namespace := rs.Primary.Attributes["namespace"]
+		name := rs.Primary.Attributes["name"]
+		repository := namespace + "/" + name
 		uuid := rs.Primary.Attributes["uuid"]
 		_, err := quayClient().GetRepoNotification(context.Background(), repository, uuid)
 		if client.IsNotFound(err) {

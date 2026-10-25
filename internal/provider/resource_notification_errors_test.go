@@ -16,7 +16,8 @@ func TestAccRepositoryNotification_NoMethodBlock(t *testing.T) {
 			{
 				Config: providerConfig() + `
 resource "quay_repository_notification" "bad" {
-  repository = "myorg/myrepo"
+  namespace  = "myorg"
+  name       = "myrepo"
   repo_push  = {}
 }
 `,
@@ -33,7 +34,8 @@ func TestAccRepositoryNotification_MultipleMethodBlocks(t *testing.T) {
 			{
 				Config: providerConfig() + `
 resource "quay_repository_notification" "bad" {
-  repository = "myorg/myrepo"
+  namespace  = "myorg"
+  name       = "myrepo"
   webhook    = { url = "https://example.com" }
   slack      = { url = "https://hooks.slack.com/services/T/B/X" }
   repo_push  = {}
@@ -52,7 +54,8 @@ func TestAccRepositoryNotification_NoEventBlock(t *testing.T) {
 			{
 				Config: providerConfig() + `
 resource "quay_repository_notification" "bad" {
-  repository = "myorg/myrepo"
+  namespace  = "myorg"
+  name       = "myrepo"
   webhook    = { url = "https://example.com" }
 }
 `,
@@ -69,7 +72,9 @@ func TestAccRepositoryNotification_MultipleEventBlocks(t *testing.T) {
 			{
 				Config: providerConfig() + `
 resource "quay_repository_notification" "bad" {
-  repository    = "myorg/myrepo"
+  namespace  = "myorg"
+
+  name       = "myrepo"
   webhook       = { url = "https://example.com" }
   repo_push     = {}
   build_success = {}
@@ -93,7 +98,9 @@ func TestAccRepositoryNotification_VulnerabilityLevelUnknownStringRejected(t *te
 			{
 				Config: providerConfig() + `
 resource "quay_repository_notification" "bad" {
-  repository          = "myorg/myrepo"
+  namespace  = "myorg"
+
+  name       = "myrepo"
   webhook             = { url = "https://example.com" }
   vulnerability_found = { level = "critical" }
 }
@@ -115,7 +122,9 @@ func TestAccRepositoryNotification_VulnerabilityLevelIntegerRejected(t *testing.
 			{
 				Config: providerConfig() + `
 resource "quay_repository_notification" "bad" {
-  repository          = "myorg/myrepo"
+  namespace  = "myorg"
+
+  name       = "myrepo"
   webhook             = { url = "https://example.com" }
   vulnerability_found = { level = 6 }
 }
@@ -138,7 +147,9 @@ func TestAccRepositoryNotification_QuayNotificationMissingTarget(t *testing.T) {
 			{
 				Config: providerConfig() + `
 resource "quay_repository_notification" "bad" {
-  repository        = "myorg/myrepo"
+  namespace  = "myorg"
+
+  name       = "myrepo"
   quay_notification = {}
   repo_push         = {}
 }
@@ -179,7 +190,8 @@ resource "quay_repository" "test" {
   description = ""
 }
 resource "quay_repository_notification" "test" {
-  repository = quay_repository.test.id
+  namespace  = quay_repository.test.namespace
+  name       = quay_repository.test.name
   webhook    = { url = "https://httpbin.org/post" }
   repo_push  = {}
 }
@@ -222,7 +234,8 @@ func TestAccRepositoryNotification_RepositoryNotFound(t *testing.T) {
 			{
 				Config: providerConfig() + `
 resource "quay_repository_notification" "bad" {
-  repository = "this-org-does-not-exist-tf-acc/also-missing"
+  namespace  = "this-org-does-not-exist-tf-acc"
+  name       = "also-missing"
   webhook    = { url = "https://example.com" }
   repo_push  = {}
 }

@@ -9,14 +9,18 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
-// notificationImportID builds the import ID (namespace/repo_name/uuid) from state.
+// notificationImportID builds the import ID (namespace/name/uuid) from state.
 func notificationImportID(resourceName string) resource.ImportStateIdFunc {
 	return func(s *terraform.State) (string, error) {
 		r, ok := s.RootModule().Resources[resourceName]
 		if !ok {
 			return "", fmt.Errorf("resource %q not found in state", resourceName)
 		}
-		return fmt.Sprintf("%s/%s", r.Primary.Attributes["repository"], r.Primary.Attributes["uuid"]), nil
+		return fmt.Sprintf("%s/%s/%s",
+			r.Primary.Attributes["namespace"],
+			r.Primary.Attributes["name"],
+			r.Primary.Attributes["uuid"],
+		), nil
 	}
 }
 
@@ -241,7 +245,8 @@ resource "quay_repository" "test" {
   description = ""
 }
 resource "quay_repository_notification" "test" {
-  repository = quay_repository.test.id
+  namespace  = quay_repository.test.namespace
+  name       = quay_repository.test.name
   title      = "import test"
   webhook    = { url = "https://httpbin.org/post" }
   repo_push  = {}
@@ -282,7 +287,8 @@ resource "quay_repository" "test" {
   description = ""
 }
 resource "quay_repository_notification" "test" {
-  repository = quay_repository.test.id
+  namespace  = quay_repository.test.namespace
+  name       = quay_repository.test.name
   title      = "import test"
   webhook    = { url = "https://httpbin.org/post" }
   repo_push  = {}
@@ -440,7 +446,8 @@ resource "quay_repository" "test" {
   description = ""
 }
 resource "quay_repository_notification" "test" {
-  repository = quay_repository.test.id
+  namespace  = quay_repository.test.namespace
+  name       = quay_repository.test.name
   title      = "import error test"
   webhook    = { url = "https://httpbin.org/post" }
   repo_push  = {}
@@ -481,7 +488,8 @@ resource "quay_repository" "test" {
   description = ""
 }
 resource "quay_repository_notification" "test" {
-  repository = quay_repository.test.id
+  namespace  = quay_repository.test.namespace
+  name       = quay_repository.test.name
   title      = "import error test"
   webhook    = { url = "https://httpbin.org/post" }
   repo_push  = {}

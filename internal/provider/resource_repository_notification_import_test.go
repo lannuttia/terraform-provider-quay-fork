@@ -49,15 +49,14 @@ func getStringAttr(t *testing.T, resp *fwresource.ImportStateResponse, attr stri
 
 // TestRepositoryNotificationImport_SetsCorrectAttributes verifies that
 // ImportState parses the 3-part import ID (namespace/repo/uuid) and sets
-// repository, uuid, and id to the correct values.
+// namespace, name, uuid, and id to the correct values.
 func TestRepositoryNotificationImport_SetsCorrectAttributes(t *testing.T) {
 	const (
 		namespace = "myorg"
 		repoName  = "myrepo"
 		uuid      = "32bb0ef6-ad69-4ccb-b64e-ddbc8bfd444d"
 		importID  = namespace + "/" + repoName + "/" + uuid
-		wantRepo  = namespace + "/" + repoName
-		wantID    = wantRepo + "/" + uuid
+		wantID    = namespace + "/" + repoName + "/" + uuid
 	)
 
 	resp := importNotificationState(t, importID)
@@ -66,8 +65,11 @@ func TestRepositoryNotificationImport_SetsCorrectAttributes(t *testing.T) {
 		t.Fatalf("ImportState returned unexpected errors: %s", resp.Diagnostics)
 	}
 
-	if got := getStringAttr(t, resp, "repository"); got != wantRepo {
-		t.Errorf("repository: want %q, got %q", wantRepo, got)
+	if got := getStringAttr(t, resp, "namespace"); got != namespace {
+		t.Errorf("namespace: want %q, got %q", namespace, got)
+	}
+	if got := getStringAttr(t, resp, "name"); got != repoName {
+		t.Errorf("name: want %q, got %q", repoName, got)
 	}
 	if got := getStringAttr(t, resp, "uuid"); got != uuid {
 		t.Errorf("uuid: want %q, got %q", uuid, got)
@@ -78,8 +80,8 @@ func TestRepositoryNotificationImport_SetsCorrectAttributes(t *testing.T) {
 }
 
 // TestRepositoryNotificationImport_IDDerivedFromParts verifies that id in
-// import state equals repository+"/"+uuid derived from the parsed parts,
-// not the raw req.ID string.
+// import state equals namespace+"/"+name+"/"+uuid derived from the parsed
+// parts, not the raw req.ID string.
 func TestRepositoryNotificationImport_IDDerivedFromParts(t *testing.T) {
 	const importID = "myorg/myrepo/32bb0ef6-ad69-4ccb-b64e-ddbc8bfd444d"
 
@@ -88,42 +90,45 @@ func TestRepositoryNotificationImport_IDDerivedFromParts(t *testing.T) {
 		t.Fatalf("ImportState returned unexpected errors: %s", resp.Diagnostics)
 	}
 
-	gotRepo := getStringAttr(t, resp, "repository")
+	gotNamespace := getStringAttr(t, resp, "namespace")
+	gotName := getStringAttr(t, resp, "name")
 	gotUUID := getStringAttr(t, resp, "uuid")
 	gotID := getStringAttr(t, resp, "id")
 
-	canonical := gotRepo + "/" + gotUUID
+	canonical := gotNamespace + "/" + gotName + "/" + gotUUID
 
 	if gotID != canonical {
 		t.Errorf(
-			"id %q does not equal repository+\"/\"+uuid %q\n"+
-				"id must be derived from the parsed parts (repository=%q, uuid=%q), "+
-				"not passed through verbatim from the import ID string",
-			gotID, canonical, gotRepo, gotUUID,
+			"id %q does not equal namespace+\"/\"+name+\"/\"+uuid %q\n"+
+				"id must be derived from the parsed parts, not passed through verbatim from the import ID string",
+			gotID, canonical,
 		)
 	}
 }
 
 // TestRepositoryNotificationImport_IDNotSetDirectlyFromReqID pins the contract
-// that id == repository+"/"+uuid across different import ID shapes.
+// that id == namespace+"/"+name+"/"+uuid across different import ID shapes.
 func TestRepositoryNotificationImport_IDNotSetDirectlyFromReqID(t *testing.T) {
 	cases := []struct {
-		name     string
-		importID string
-		wantRepo string
-		wantUUID string
+		name          string
+		importID      string
+		wantNamespace string
+		wantName      string
+		wantUUID      string
 	}{
 		{
-			name:     "simple",
-			importID: "acme/frontend/aaaaaaaa-0000-0000-0000-000000000001",
-			wantRepo: "acme/frontend",
-			wantUUID: "aaaaaaaa-0000-0000-0000-000000000001",
+			name:          "simple",
+			importID:      "acme/frontend/aaaaaaaa-0000-0000-0000-000000000001",
+			wantNamespace: "acme",
+			wantName:      "frontend",
+			wantUUID:      "aaaaaaaa-0000-0000-0000-000000000001",
 		},
 		{
-			name:     "hyphenated org and repo",
-			importID: "my-org/my-repo/bbbbbbbb-0000-0000-0000-000000000002",
-			wantRepo: "my-org/my-repo",
-			wantUUID: "bbbbbbbb-0000-0000-0000-000000000002",
+			name:          "hyphenated org and repo",
+			importID:      "my-org/my-repo/bbbbbbbb-0000-0000-0000-000000000002",
+			wantNamespace: "my-org",
+			wantName:      "my-repo",
+			wantUUID:      "bbbbbbbb-0000-0000-0000-000000000002",
 		},
 	}
 
@@ -134,20 +139,24 @@ func TestRepositoryNotificationImport_IDNotSetDirectlyFromReqID(t *testing.T) {
 				t.Fatalf("ImportState errors: %s", resp.Diagnostics)
 			}
 
-			gotRepo := getStringAttr(t, resp, "repository")
+			gotNamespace := getStringAttr(t, resp, "namespace")
+			gotName := getStringAttr(t, resp, "name")
 			gotUUID := getStringAttr(t, resp, "uuid")
 			gotID := getStringAttr(t, resp, "id")
 
-			if gotRepo != tc.wantRepo {
-				t.Errorf("repository: want %q, got %q", tc.wantRepo, gotRepo)
+			if gotNamespace != tc.wantNamespace {
+				t.Errorf("namespace: want %q, got %q", tc.wantNamespace, gotNamespace)
+			}
+			if gotName != tc.wantName {
+				t.Errorf("name: want %q, got %q", tc.wantName, gotName)
 			}
 			if gotUUID != tc.wantUUID {
 				t.Errorf("uuid: want %q, got %q", tc.wantUUID, gotUUID)
 			}
 
-			wantID := tc.wantRepo + "/" + tc.wantUUID
+			wantID := tc.wantNamespace + "/" + tc.wantName + "/" + tc.wantUUID
 			if gotID != wantID {
-				t.Errorf("id: want %q (repository+\"/\"+uuid), got %q", wantID, gotID)
+				t.Errorf("id: want %q (namespace+\"/\"+name+\"/\"+uuid), got %q", wantID, gotID)
 			}
 		})
 	}

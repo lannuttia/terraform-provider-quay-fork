@@ -31,7 +31,8 @@ resource "quay_repository" "test" {
   description = ""
 }
 resource "quay_repository_notification" "test" {
-  repository = quay_repository.test.id
+  namespace  = quay_repository.test.namespace
+  name       = quay_repository.test.name
   title      = "push webhook"
   webhook    = { url = "https://httpbin.org/post" }
   repo_push  = {}

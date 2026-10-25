@@ -66,7 +66,8 @@ resource "quay_repository_notification" "main_build_email" {
 
 ### Required
 
-- `repository` (String) The repository this notification belongs to, in namespace/name format.
+- `name` (String) The name of the repository.
+- `namespace` (String) The namespace (organization or username) that owns the repository.
 
 ### Optional
 
