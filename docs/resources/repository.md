@@ -12,19 +12,47 @@ Manages a Quay repository.
 
 ## Destruction behaviour
 
-Destroying or replacing a `quay_repository` resource (including any change to
-`name` or `namespace`, which triggers a replace) permanently deletes the
-repository and all of its images with no grace period.
+Destroying a `quay_repository` resource permanently deletes the repository and
+all of its images with no grace period.
+
+**Quay has no rename operation.** Changing `name` or `namespace` in your
+configuration plans a destroy-then-create (`-/+`), which deletes the existing
+repository and all of its content before creating a new empty one. Treat a
+`name` or `namespace` change as a destructive operation.
 
 To guard against accidental data loss, the provider refuses to delete a
-repository that still has active tags. Remove all tags before destroying the
-resource, or use
-[`lifecycle { prevent_destroy = true }`](https://developer.hashicorp.com/terraform/language/meta-arguments/lifecycle#prevent_destroy)
-to block destruction entirely.
+repository that still has active tags. Remove all active tags before destroying
+the resource.
 
 **Limitation:** the guard checks active tags only. Deleted tags that are still
 within the `tag_expiration_s` restore window are not counted and will be
 permanently lost when the repository is deleted.
+
+To prevent Terraform from ever destroying this resource, add a
+[`lifecycle` block](https://developer.hashicorp.com/terraform/language/meta-arguments/lifecycle#prevent_destroy):
+
+```terraform
+resource "quay_repository" "example" {
+  # ...
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+```
+
+Note that `prevent_destroy = true` only prevents destruction while the block is
+present in configuration. To stop managing a repository without deleting it,
+use a [`removed` block](https://developer.hashicorp.com/terraform/language/resources/syntax#removing-resources)
+(Terraform 1.7+) instead:
+
+```terraform
+removed {
+  from = quay_repository.example
+  lifecycle {
+    destroy = false
+  }
+}
+```
 
 ## Example Usage
 
