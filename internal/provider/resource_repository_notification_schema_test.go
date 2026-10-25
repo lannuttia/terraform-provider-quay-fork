@@ -128,20 +128,44 @@ func TestNotificationSchema_SensitiveFields(t *testing.T) {
 	}
 }
 
-// TestNotificationSchema_VulnerabilityLevelIsString asserts that the
-// vulnerability_found.level attribute is a StringAttribute, not an integer.
-// Exposing a numeric index as the public API is poor UX — users are expected
-// to know that 2 means "Medium". The provider should accept the canonical Quay
-// severity names ("Critical", "High", "Medium", "Low", "Negligible", "Unknown")
-// and translate to the integer index internally.
-func TestNotificationSchema_VulnerabilityLevelIsString(t *testing.T) {
+// TestNotificationSchema_VulnerabilityLevelIsOptionalString asserts that the
+// vulnerability_found.level attribute is an Optional StringAttribute. It must
+// be Optional (not Required) because Quay treats a missing level as "any
+// severity", and the Quay UI creates notifications without a level. Making it
+// Required would prevent importing those notifications.
+func TestNotificationSchema_VulnerabilityLevelIsOptionalString(t *testing.T) {
 	s := schemaFor(t, provider.NewRepositoryNotificationResource)
 	attr := nestedAttr(t, s, "vulnerability_found", "level")
 
-	if _, ok := attr.(schema.StringAttribute); !ok {
-		t.Errorf("vulnerability_found.level: expected schema.StringAttribute, got %T — "+
+	strAttr, ok := attr.(schema.StringAttribute)
+	if !ok {
+		t.Fatalf("vulnerability_found.level: expected schema.StringAttribute, got %T — "+
 			"the level must be a human-readable severity name, not a magic integer", attr)
 	}
+	if strAttr.Required {
+		t.Error("vulnerability_found.level must be Optional, not Required — " +
+			"Quay treats a missing level as 'any severity' and the UI omits it")
+	}
+}
+
+// TestNotificationSchema_VulnerabilityLevelOmittedAccepted asserts that omitting
+// level entirely from a vulnerability_found block is accepted at plan time.
+func TestNotificationSchema_VulnerabilityLevelOmittedAccepted(t *testing.T) {
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: providerFactories(),
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig() + `
+resource "quay_repository_notification" "test" {
+  repository          = "myorg/myrepo"
+  webhook             = { url = "https://example.com" }
+  vulnerability_found = {}
+}
+`,
+				ExpectError: regexp.MustCompile(`(?i)(404|not found|Error Creating)`),
+			},
+		},
+	})
 }
 
 // TestNotificationSchema_VulnerabilityLevelRejectsInteger asserts that passing

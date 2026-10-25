@@ -295,14 +295,14 @@ func (r *RepositoryNotificationResource) Schema(_ context.Context, _ resource.Sc
 			},
 			"vulnerability_found": schema.SingleNestedAttribute{
 				Optional:      true,
-				Description:   "Trigger when a vulnerability is found. The required level attribute sets the minimum severity that triggers the notification.",
+				Description:   "Trigger when a vulnerability is found.",
 				PlanModifiers: requiresReplaceObj,
 				Attributes: map[string]schema.Attribute{
 					"level": schema.StringAttribute{
-						Required: true,
+						Optional: true,
 						Description: "The minimum vulnerability severity level that triggers the notification. " +
 							"One of: Critical, High, Medium, Low, Negligible, Unknown. " +
-							"Notifications fire for vulnerabilities at or above this severity. " +
+							"When omitted, the notification fires for any severity. " +
 							"These names match the severity labels shown in the Quay UI.",
 						Validators: []validator.String{
 							stringvalidator.OneOf("Critical", "High", "Medium", "Low", "Negligible", "Unknown"),
@@ -515,6 +515,9 @@ func (m *RepositoryNotificationResourceModel) eventAndConfig() (string, map[stri
 	case m.BuildCancelled != nil:
 		return "build_cancelled", buildRefRegexConfig(m.BuildCancelled.RefRegex)
 	case m.VulnerabilityFound != nil:
+		if m.VulnerabilityFound.Level.IsNull() {
+			return "vulnerability_found", map[string]any{}
+		}
 		idx, _ := client.VulnerabilityLevelIndexFromString(m.VulnerabilityFound.Level.ValueString())
 		return "vulnerability_found", map[string]any{"level": idx}
 	case m.RepoMirrorSyncStarted != nil:
@@ -616,16 +619,15 @@ func (r *RepositoryNotificationResource) mapToState(notif *client.Notification, 
 	case "build_cancelled":
 		state.BuildCancelled = &BuildEvent{RefRegex: refRegexFromEventConfig(notif.EventConfig)}
 	case "vulnerability_found":
-		levelStr, ok := notif.EventConfig.VulnerabilityLevelString()
-		if !ok {
-			diags.AddError("Unknown Vulnerability Level",
-				fmt.Sprintf("The Quay API returned an unrecognised vulnerability level in event_config: %v. "+
-					"Please report this as a provider bug.", notif.EventConfig["level"]))
-			return diags
+		var level types.String
+		if levelStr, ok := notif.EventConfig.VulnerabilityLevelString(); ok {
+			level = types.StringValue(levelStr)
+		} else {
+			// No level in the event config means "any severity" — this is
+			// valid and is what the Quay UI sends when no level is selected.
+			level = types.StringNull()
 		}
-		state.VulnerabilityFound = &VulnerabilityFoundEvent{
-			Level: types.StringValue(levelStr),
-		}
+		state.VulnerabilityFound = &VulnerabilityFoundEvent{Level: level}
 	case "repo_mirror_sync_started":
 		state.RepoMirrorSyncStarted = &RepoMirrorSyncStartedEvent{}
 	case "repo_mirror_sync_success":

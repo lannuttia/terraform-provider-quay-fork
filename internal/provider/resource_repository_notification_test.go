@@ -125,6 +125,51 @@ resource "quay_repository_notification" "test" {
 	})
 }
 
+// TestAccRepositoryNotification_vulnerabilityNoLevel verifies that a
+// vulnerability_found notification with no level (meaning any severity) can be
+// created and read back without error. The Quay UI and API both support
+// omitting the level, which means "notify on any severity", but the provider
+// previously required level to be set and errored on read when it was absent.
+func TestAccRepositoryNotification_vulnerabilityNoLevel(t *testing.T) {
+	skipIfNoAcc(t)
+	orgName := rname("tf-acc-vuln-nolvl-org")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: providerFactories(),
+		CheckDestroy: resource.ComposeTestCheckFunc(
+			checkOrganizationDestroyed(orgName),
+			checkRepositoryDestroyed(orgName+"/vuln-nolvl-repo"),
+			checkNotificationDestroyed("quay_repository_notification.test"),
+		),
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig() + fmt.Sprintf(`
+resource "quay_organization" "test" {
+  name  = %q
+  email = "tf-acc-vuln-nolvl@example.com"
+}
+resource "quay_repository" "test" {
+  namespace   = quay_organization.test.name
+  name        = "vuln-nolvl-repo"
+  visibility  = "private"
+  description = ""
+}
+resource "quay_repository_notification" "test" {
+  repository          = quay_repository.test.id
+  title               = "any severity"
+  webhook             = { url = "https://httpbin.org/post" }
+  vulnerability_found = {}
+}
+`, orgName),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttrSet("quay_repository_notification.test", "uuid"),
+					resource.TestCheckNoResourceAttr("quay_repository_notification.test", "vulnerability_found.level"),
+				),
+			},
+		},
+	})
+}
+
 func TestAccRepositoryNotification_buildWithRefRegex(t *testing.T) {
 	skipIfNoAcc(t)
 	orgName := rname("tf-acc-build-org")
