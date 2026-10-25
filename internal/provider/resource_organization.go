@@ -121,25 +121,30 @@ func (r *OrganizationResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	// Save state before the follow-up PUT so a failure there doesn't orphan the org.
+	// The POST response does not include fields like invoice_email or
+	// tag_expiration_s, so Quay's defaults would be sent back to the API
+	// rather than the user's configured values if we read from state here.
+	needsUpdate := (!plan.InvoiceEmail.IsNull() && !plan.InvoiceEmail.IsUnknown()) ||
+		(!plan.InvoiceEmailAddress.IsNull() && !plan.InvoiceEmailAddress.IsUnknown()) ||
+		(!plan.TagExpirationS.IsNull() && !plan.TagExpirationS.IsUnknown())
+	var updateReq client.UpdateOrganizationRequest
+	if needsUpdate {
+		updateReq = client.UpdateOrganizationRequest{
+			Email:               plan.Email.ValueString(),
+			InvoiceEmail:        plan.InvoiceEmail.ValueBool(),
+			InvoiceEmailAddress: plan.InvoiceEmailAddress.ValueString(),
+			TagExpirationS:      int(plan.TagExpirationS.ValueInt64()),
+		}
+	}
+
+	// Save state now so a failure in the follow-up PUT doesn't orphan the org.
 	r.mapToState(org, &plan)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 
-	// Fields not accepted by POST are applied via a follow-up PUT.
-	// Unknown values are computed fields the user did not set; skip them.
-	needsUpdate := (!plan.InvoiceEmail.IsNull() && !plan.InvoiceEmail.IsUnknown()) ||
-		(!plan.InvoiceEmailAddress.IsNull() && !plan.InvoiceEmailAddress.IsUnknown()) ||
-		(!plan.TagExpirationS.IsNull() && !plan.TagExpirationS.IsUnknown())
 	if needsUpdate {
-		updateReq := client.UpdateOrganizationRequest{
-			Email:               plan.Email.ValueString(),
-			InvoiceEmail:        plan.InvoiceEmail.ValueBool(),
-			InvoiceEmailAddress: plan.InvoiceEmailAddress.ValueString(),
-			TagExpirationS:      int(plan.TagExpirationS.ValueInt64()),
-		}
 		org, err = r.client.UpdateOrganization(ctx, plan.Name.ValueString(), updateReq)
 		if err != nil {
 			resp.Diagnostics.AddError("Error Configuring Organization", err.Error())
