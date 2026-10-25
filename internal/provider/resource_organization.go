@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/hashicorp/terraform-plugin-framework-validators/int64validator"
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
@@ -12,6 +13,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringdefault"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
+	"github.com/hashicorp/terraform-plugin-framework/schema/validator"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/quay/terraform-provider-quay/internal/client"
 )
@@ -79,9 +81,14 @@ func (r *OrganizationResource) Schema(_ context.Context, _ resource.SchemaReques
 				Default:     stringdefault.StaticString(""),
 			},
 			"tag_expiration_s": schema.Int64Attribute{
-				Optional:    true,
-				Computed:    true,
-				Description: "The default tag expiration in seconds for the organization.",
+				Optional: true,
+				Computed: true,
+				Description: "How long deleted tags can be restored from the time machine, in seconds. " +
+					"Must be one of Quay's TAG_EXPIRATION_OPTIONS: 0, 86400, 604800, 1209600, or 2419200. " +
+					"Lowering this value shortens the restore window for tags already deleted.",
+				Validators: []validator.Int64{
+					int64validator.OneOf(0, 86400, 604800, 1209600, 2419200),
+				},
 				PlanModifiers: []planmodifier.Int64{
 					int64planmodifier.UseStateForUnknown(),
 				},

@@ -9,6 +9,28 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
+// TestAccOrganization_TagExpirationSInvalidValueRejected verifies that a
+// tag_expiration_s value not in Quay's TAG_EXPIRATION_OPTIONS is rejected at
+// plan time. Without a validator the provider accepts any integer and only
+// fails at apply time with an opaque 400 from the Quay API.
+func TestAccOrganization_TagExpirationSInvalidValueRejected(t *testing.T) {
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: providerFactories(),
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig() + `
+resource "quay_organization" "test" {
+  name             = "myorg"
+  email            = "tf-acc@example.com"
+  tag_expiration_s = 999
+}
+`,
+				ExpectError: regexp.MustCompile(`(?i)(one of|invalid attribute value|value must be)`),
+			},
+		},
+	})
+}
+
 func TestAccOrganization_DuplicateName(t *testing.T) {
 	skipIfNoAcc(t)
 	orgName := rname("tf-acc-dup-org")
