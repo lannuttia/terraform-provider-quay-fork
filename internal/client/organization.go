@@ -8,9 +8,8 @@ import (
 // Organization represents a Quay organization.
 //
 // InvoiceEmail, InvoiceEmailAddress, TagExpirationS and IsFreeAccount are
-// admin-only fields that Quay omits from the response for non-admin tokens.
-// Pointer types allow callers to distinguish "field absent" from "field present
-// with a zero value".
+// admin-only fields omitted by Quay for non-admin tokens. Pointer types let
+// callers distinguish "field absent" from "field present with a zero value".
 type Organization struct {
 	Name                string  `json:"name"`
 	Email               string  `json:"email"`
@@ -36,8 +35,7 @@ func (c *Client) CreateOrganization(ctx context.Context, req CreateOrganizationR
 	if err := c.post(ctx, "organization/", req, nil); err != nil {
 		return nil, fmt.Errorf("creating organization %q: %w", req.Name, err)
 	}
-	// POST /organization/ returns an empty 201 body; a GET is required to read
-	// back the created resource.
+	// POST /organization/ returns an empty 201 body; the created resource must be fetched separately.
 	org, err := c.GetOrganization(ctx, req.Name)
 	if err != nil {
 		return nil, fmt.Errorf("organization %q was already created but could not be read back: %w", req.Name, err)

@@ -117,11 +117,8 @@ data "quay_repository" "test" {
 	})
 }
 
-// TestAccRepository_CreatePublic verifies that creating a repository with
-// visibility = "public" is reflected correctly in state. Quay's POST
-// /repository response omits is_public, so the provider must issue a GET
-// after create to obtain the actual visibility rather than relying on the
-// POST response body.
+// TestAccRepository_CreatePublic verifies that public visibility is reflected in state.
+// Quay's POST /repository response omits is_public, so the actual visibility must be fetched.
 func TestAccRepository_CreatePublic(t *testing.T) {
 	skipIfNoAcc(t)
 	orgName := rname("tf-acc-pub-repo-org")
@@ -165,8 +162,7 @@ func TestAccRepository_DeleteNonEmpty(t *testing.T) {
 			checkOrganizationDestroyed(orgName),
 		),
 		Steps: []resource.TestStep{
-			// Create the org and repository, then push a real image tag so the
-			// repository is non-empty when the destroy runs.
+			// Push a real tag so the repository is non-empty when destroy runs.
 			{
 				Config: providerConfig() + fmt.Sprintf(`
 resource "quay_organization" "test" {
@@ -187,8 +183,7 @@ resource "quay_repository" "test" {
 					},
 				),
 			},
-			// Remove the repository block. It contains a tag so the provider
-			// must refuse to destroy it.
+			// The repository has a tag; the provider must refuse to destroy it.
 			{
 				Config: providerConfig() + fmt.Sprintf(`
 resource "quay_organization" "test" {
@@ -198,8 +193,7 @@ resource "quay_organization" "test" {
 `, orgName),
 				ExpectError: regexp.MustCompile(`(?i)(non-empty|contains active tags|cannot delete)`),
 			},
-			// Delete the tag out-of-band so the repository is empty, then let
-			// Terraform destroy the now-empty repository and organization cleanly.
+			// Delete the tag out-of-band so Terraform can destroy the now-empty repository.
 			{
 				Config: providerConfig() + fmt.Sprintf(`
 resource "quay_organization" "test" {

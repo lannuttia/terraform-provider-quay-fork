@@ -7,9 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/helper/resource"
 )
 
-// TestProvider_TokenFromEnv verifies that the provider configures successfully
-// when the token is supplied only via the QUAY_TOKEN environment variable and
-// is omitted from the provider block entirely.
+// TestProvider_TokenFromEnv verifies that QUAY_TOKEN can substitute for the token attribute.
 func TestProvider_TokenFromEnv(t *testing.T) {
 	skipIfNoAcc(t)
 
@@ -19,17 +17,12 @@ func TestProvider_TokenFromEnv(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: providerFactories(),
 		Steps: []resource.TestStep{
-			{
-				// token and url are intentionally omitted — both come from env vars.
-				Config: `provider "quay" {}`,
-			},
+			{Config: `provider "quay" {}`},
 		},
 	})
 }
 
-// TestProvider_TokenInBlockURLFromEnv verifies that the provider configures
-// successfully when the token is set in the provider block and the url comes
-// from the QUAY_URL environment variable.
+// TestProvider_TokenInBlockURLFromEnv verifies that QUAY_URL can substitute for the url attribute.
 func TestProvider_TokenInBlockURLFromEnv(t *testing.T) {
 	skipIfNoAcc(t)
 
@@ -39,7 +32,6 @@ func TestProvider_TokenInBlockURLFromEnv(t *testing.T) {
 		ProtoV6ProviderFactories: providerFactories(),
 		Steps: []resource.TestStep{
 			{
-				// url is intentionally omitted — it comes from the QUAY_URL env var.
 				Config: `
 provider "quay" {
   token = "` + testState.quayToken + `"
@@ -50,9 +42,7 @@ provider "quay" {
 	})
 }
 
-// TestProvider_URLInBlockTokenFromEnv verifies that the provider configures
-// successfully when the url is set in the provider block and the token comes
-// from the QUAY_TOKEN environment variable.
+// TestProvider_URLInBlockTokenFromEnv verifies that QUAY_TOKEN can substitute for the token attribute.
 func TestProvider_URLInBlockTokenFromEnv(t *testing.T) {
 	skipIfNoAcc(t)
 
@@ -62,7 +52,6 @@ func TestProvider_URLInBlockTokenFromEnv(t *testing.T) {
 		ProtoV6ProviderFactories: providerFactories(),
 		Steps: []resource.TestStep{
 			{
-				// token is intentionally omitted — it comes from the QUAY_TOKEN env var.
 				Config: `
 provider "quay" {
   url = "` + testState.quayURL + `"
@@ -73,11 +62,8 @@ provider "quay" {
 	})
 }
 
-// TestProvider_UnknownToken verifies that an unknown token value (e.g. from a
-// resource not yet created) is rejected at configure time rather than silently
-// falling back to QUAY_TOKEN or an empty string. A silent fallback could send
-// the token to the wrong host or use no token at all, removing resources from
-// state when the API returns 404 or 401.
+// TestProvider_UnknownToken verifies that an unknown token is rejected at configure time.
+// A silent fallback to QUAY_TOKEN could send the token to the wrong host or drop resources from state.
 func TestProvider_UnknownToken(t *testing.T) {
 	t.Setenv("QUAY_TOKEN", "env-token-should-not-be-used")
 
@@ -85,8 +71,6 @@ func TestProvider_UnknownToken(t *testing.T) {
 		ProtoV6ProviderFactories: providerFactories(),
 		Steps: []resource.TestStep{
 			{
-				// terraform_data.test.output is unknown at plan time, so
-				// token is unknown when the provider is configured.
 				Config: `
 resource "terraform_data" "test" {
   input = "not-yet-known"
@@ -108,8 +92,8 @@ data "quay_repository" "test" {
 	})
 }
 
-// TestProvider_UnknownURL verifies that an unknown url value is rejected at
-// configure time rather than silently falling back to QUAY_URL or https://quay.io.
+// TestProvider_UnknownURL verifies that an unknown url is rejected at configure time.
+// A silent fallback to QUAY_URL could send requests to the wrong host.
 func TestProvider_UnknownURL(t *testing.T) {
 	t.Setenv("QUAY_TOKEN", "test-token")
 	t.Setenv("QUAY_URL", "https://should-not-be-used.example.com")
@@ -139,8 +123,7 @@ data "quay_repository" "test" {
 	})
 }
 
-// TestProvider_HTTPURLRejected verifies that an http:// URL is rejected at
-// configure time, since the bearer token would be sent in plaintext.
+// TestProvider_HTTPURLRejected verifies that http:// URLs are rejected to prevent the token leaking in plaintext.
 func TestProvider_HTTPURLRejected(t *testing.T) {
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: providerFactories(),
@@ -163,10 +146,8 @@ data "quay_repository" "test" {
 	})
 }
 
-// TestProvider_NegativeTimeoutInConfig verifies that a negative timeout value
-// supplied in the provider block is rejected at configure time. A negative
-// time.Duration passed to http.Client.Timeout is treated as no timeout, which
-// silently ignores the user's intent instead of surfacing an error.
+// TestProvider_NegativeTimeoutInConfig verifies that a negative timeout is rejected at configure time.
+// A negative time.Duration is treated by http.Client as no timeout, silently ignoring the user's intent.
 func TestProvider_NegativeTimeoutInConfig(t *testing.T) {
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: providerFactories(),
@@ -190,9 +171,7 @@ data "quay_repository" "test" {
 	})
 }
 
-// TestProvider_NegativeTimeoutInEnv verifies that a negative value in the
-// QUAY_TIMEOUT environment variable is rejected at configure time with a clear
-// error. The same silent-no-timeout behaviour applies as for the config path.
+// TestProvider_NegativeTimeoutInEnv verifies that a negative QUAY_TIMEOUT is rejected at configure time.
 func TestProvider_NegativeTimeoutInEnv(t *testing.T) {
 	t.Setenv("QUAY_TIMEOUT", "-1")
 
@@ -217,8 +196,7 @@ data "quay_repository" "test" {
 	})
 }
 
-// TestProvider_MissingToken verifies the provider returns a clear error when
-// no token is supplied (neither in config nor environment).
+// TestProvider_MissingToken verifies the provider errors when no token is supplied.
 func TestProvider_MissingToken(t *testing.T) {
 	t.Setenv("QUAY_TOKEN", "")
 
@@ -243,8 +221,7 @@ data "quay_repository" "test" {
 	})
 }
 
-// TestProvider_InvalidToken verifies that an invalid token results in a
-// meaningful error from the API rather than a panic or empty state.
+// TestProvider_InvalidToken verifies that an invalid token surfaces a meaningful API error.
 func TestProvider_InvalidToken(t *testing.T) {
 	skipIfNoAcc(t)
 	resource.Test(t, resource.TestCase{

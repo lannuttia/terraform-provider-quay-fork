@@ -263,8 +263,7 @@ func TestHasOrganizationRepositories_NotFound(t *testing.T) {
 
 // ----- NamespaceExists ---------------------------------------------------
 
-// TestNamespaceExists_OrgNamespace verifies that NamespaceExists returns true
-// when the namespace belongs to an organisation (GET /organization/<name> → 200).
+// TestNamespaceExists_OrgNamespace verifies that an organisation namespace is recognised.
 func TestNamespaceExists_OrgNamespace(t *testing.T) {
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		switch {
@@ -283,15 +282,12 @@ func TestNamespaceExists_OrgNamespace(t *testing.T) {
 	}
 }
 
-// TestNamespaceExists_UserNamespace verifies that NamespaceExists returns true
-// when the namespace belongs to a user account (GET /organization/<name> → 404,
-// GET /users/<name> → 200). This is the key case the original code mishandled:
-// it only checked the org endpoint, so user namespaces always looked absent.
+// TestNamespaceExists_UserNamespace verifies that a user-account namespace is recognised.
+// The original code only checked the org endpoint, so user namespaces always looked absent.
 func TestNamespaceExists_UserNamespace(t *testing.T) {
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case strings.HasPrefix(r.URL.Path, "/api/v1/organization/"):
-			// User namespaces are not organisations.
 			writeJSON(w, http.StatusNotFound, map[string]string{"message": "not found"})
 		case strings.HasPrefix(r.URL.Path, "/api/v1/users/"):
 			writeJSON(w, http.StatusOK, map[string]string{"username": "alice"})
@@ -308,8 +304,7 @@ func TestNamespaceExists_UserNamespace(t *testing.T) {
 	}
 }
 
-// TestNamespaceExists_Absent verifies that NamespaceExists returns false when
-// both the org and user endpoints return 404 — i.e. the namespace is truly gone.
+// TestNamespaceExists_Absent verifies that (false, nil) is returned when neither endpoint recognises the name.
 func TestNamespaceExists_Absent(t *testing.T) {
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"message": "not found"})

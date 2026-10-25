@@ -15,33 +15,27 @@ import (
 	"github.com/quay/terraform-provider-quay/internal/provider"
 )
 
-// testState holds the running Quay instance URL and token, shared across all
-// acceptance tests in this package.
+// testState holds the Quay instance URL and token shared across all acceptance tests.
 var testState struct {
 	quayURL   string
 	quayToken string
-	// runID is a short random suffix appended to all resource names so that
-	// parallel matrix jobs (e.g. Terraform 1.13 vs 1.14) never collide on
-	// the same org/repo names in a shared Quay instance.
+	// runID prevents name collisions between parallel matrix jobs.
 	runID string
 }
 
-// rname returns a resource name unique to this test run.
+// rname returns a resource name unique to this test run to prevent cross-run collisions.
 func rname(base string) string {
 	return fmt.Sprintf("%s-%s", base, testState.runID)
 }
 
-// TestMain starts a Quay testcontainer once for the entire package when
-// TF_ACC is set and no external QUAY_URL/QUAY_TOKEN env vars are provided.
+// TestMain starts a Quay testcontainer once per package run when TF_ACC is set.
 func TestMain(m *testing.M) {
 	os.Exit(runTests(m))
 }
 
-// runTests contains the real TestMain logic and returns an exit code.
-// Keeping os.Exit in TestMain means deferred calls here unwind normally.
+// runTests contains the real TestMain logic. os.Exit is kept in TestMain so defers here unwind normally.
 func runTests(m *testing.M) int {
 	if os.Getenv("TF_ACC") == "" {
-		// No acceptance testing — run unit tests (if any) and exit.
 		return m.Run()
 	}
 
@@ -53,9 +47,7 @@ func runTests(m *testing.M) int {
 		return m.Run()
 	}
 
-	// Ryuk reaper containers don't work under Podman rootless — they leave
-	// containers running indefinitely. Disable Ryuk and rely on explicit
-	// Cleanup() calls instead.
+	// Ryuk doesn't work under Podman rootless; containers must be cleaned up explicitly.
 	os.Setenv("TESTCONTAINERS_RYUK_DISABLED", "true") //nolint:errcheck
 
 	ctx := context.Background()
@@ -70,7 +62,6 @@ func runTests(m *testing.M) int {
 	testState.quayToken = quayC.accessToken
 	testState.runID = fmt.Sprintf("%06x", rand.Intn(0xffffff))
 
-	// Make credentials available to child processes spawned by the test framework.
 	if err := os.Setenv("QUAY_URL", testState.quayURL); err != nil {
 		fmt.Fprintf(os.Stderr, "FATAL: could not set QUAY_URL: %v\n", err)
 		return 1
@@ -83,14 +74,14 @@ func runTests(m *testing.M) int {
 	return m.Run()
 }
 
-// providerFactories returns the provider factory map used by resource.Test.
+// providerFactories returns the provider factory map for resource.Test.
 func providerFactories() map[string]func() (tfprotov6.ProviderServer, error) {
 	return map[string]func() (tfprotov6.ProviderServer, error){
 		"quay": providerserver.NewProtocol6WithError(provider.New("test")()),
 	}
 }
 
-// providerConfig returns an HCL provider block targeting the shared test container.
+// providerConfig returns an HCL provider block for the shared test container.
 func providerConfig() string {
 	return fmt.Sprintf(`
 provider "quay" {
@@ -100,7 +91,7 @@ provider "quay" {
 `, testState.quayURL, testState.quayToken)
 }
 
-// skipIfNoAcc skips the test if TF_ACC is not set.
+// skipIfNoAcc skips acceptance tests when TF_ACC is not set.
 func skipIfNoAcc(t *testing.T) {
 	t.Helper()
 	if os.Getenv("TF_ACC") == "" {
@@ -108,15 +99,12 @@ func skipIfNoAcc(t *testing.T) {
 	}
 }
 
-// ----- CheckDestroy helpers -----------------------------------------------
-
 // quayClient returns a Quay API client pointed at the shared test instance.
 func quayClient() *client.Client {
 	return client.New(testState.quayURL, testState.quayToken, client.DefaultTimeout)
 }
 
-// checkOrganizationDestroyed returns a TestCheckFunc that fails if the named
-// organization still exists in Quay after terraform destroy.
+// checkOrganizationDestroyed fails if the named organization still exists after destroy.
 func checkOrganizationDestroyed(name string) resource.TestCheckFunc {
 	return func(_ *terraform.State) error {
 		_, err := quayClient().GetOrganization(context.Background(), name)
@@ -130,16 +118,14 @@ func checkOrganizationDestroyed(name string) resource.TestCheckFunc {
 	}
 }
 
-// checkRepositoryDestroyed returns a TestCheckFunc that fails if the named
-// repository (namespace/name) still exists in Quay after terraform destroy.
+// checkRepositoryDestroyed fails if the named repository still exists after destroy.
 func checkRepositoryDestroyed(repository string) resource.TestCheckFunc {
 	return func(_ *terraform.State) error {
 		_, err := quayClient().GetRepository(context.Background(), repository)
 		if client.IsNotFound(err) {
 			return nil
 		}
-		// A 403 means the org namespace itself was removed (or the token lacks
-		// repo:read scope for org repos), so the repository is effectively gone.
+		// A 403 means the org namespace was removed or the token lacks scope.
 		if client.IsForbidden(err) {
 			return nil
 		}
@@ -150,14 +136,11 @@ func checkRepositoryDestroyed(repository string) resource.TestCheckFunc {
 	}
 }
 
-// checkNotificationDestroyed returns a TestCheckFunc that reads the uuid and
-// repository attributes from state and fails if the notification still exists
-// in Quay after terraform destroy.
+// checkNotificationDestroyed fails if the notification still exists after destroy.
 func checkNotificationDestroyed(resourceName string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		rs, ok := s.RootModule().Resources[resourceName]
 		if !ok {
-			// Resource was removed from state — nothing to verify.
 			return nil
 		}
 		namespace := rs.Primary.Attributes["namespace"]
@@ -168,8 +151,7 @@ func checkNotificationDestroyed(resourceName string) resource.TestCheckFunc {
 		if client.IsNotFound(err) {
 			return nil
 		}
-		// A 403 means the org/repo was removed (or the token lacks scope), so
-		// the notification is effectively gone.
+		// A 403 means the org/repo was removed or the token lacks scope.
 		if client.IsForbidden(err) {
 			return nil
 		}
@@ -180,17 +162,12 @@ func checkNotificationDestroyed(resourceName string) resource.TestCheckFunc {
 	}
 }
 
-// ----- Provider smoke test ------------------------------------------------
-
 func TestProvider_Configure(t *testing.T) {
 	skipIfNoAcc(t)
 	resource.Test(t, resource.TestCase{
 		ProtoV6ProviderFactories: providerFactories(),
 		Steps: []resource.TestStep{
-			{
-				// A minimal config — just verify the provider configures without error.
-				Config: providerConfig(),
-			},
+			{Config: providerConfig()},
 		},
 	})
 }

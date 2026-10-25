@@ -10,8 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 )
 
-// splitImportID splits an import ID by "/" and returns exactly n parts,
-// or adds an error diagnostic if the count doesn't match.
+// splitImportID splits an import ID by "/" and returns exactly n parts.
 func splitImportID(resp *resource.ImportStateResponse, id string, n int, example string) ([]string, diag.Diagnostics) {
 	parts := strings.Split(id, "/")
 	if len(parts) != n {
@@ -33,7 +32,7 @@ func splitImportID(resp *resource.ImportStateResponse, id string, n int, example
 	return parts, nil
 }
 
-// setattrs is a helper to set multiple path/value pairs in import state.
+// setAttrs sets multiple path/value pairs in import state.
 func setAttrs(ctx context.Context, resp *resource.ImportStateResponse, attrs map[string]string) {
 	for p, v := range attrs {
 		resp.Diagnostics.Append(resp.State.SetAttribute(ctx, path.Root(p), v)...)

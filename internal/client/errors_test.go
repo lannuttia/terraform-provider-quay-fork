@@ -93,11 +93,9 @@ func TestAPIError_500_InternalServerError(t *testing.T) {
 	}
 }
 
-// TestAPIError_UsesDetailField verifies that the detail field from Quay's
-// structured error response is used as the error message in preference to the
-// raw JSON body. Quay's API errors carry detail and error_message as the
-// primary human-readable fields; reading only message leaves users with raw
-// JSON in error output.
+// TestAPIError_UsesDetailField verifies that the detail field is used in preference
+// to the raw JSON body. Quay's primary human-readable error fields are detail and
+// error_message; reading only message leaves users with raw JSON in error output.
 func TestAPIError_UsesDetailField(t *testing.T) {
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{
@@ -120,8 +118,7 @@ func TestAPIError_UsesDetailField(t *testing.T) {
 	}
 }
 
-// TestAPIError_UsesErrorMessageField verifies that error_message is used when
-// detail is absent.
+// TestAPIError_UsesErrorMessageField verifies that error_message is preferred when detail is absent.
 func TestAPIError_UsesErrorMessageField(t *testing.T) {
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{
@@ -193,17 +190,12 @@ func TestContextCancellation(t *testing.T) {
 
 // ----- Empty token --------------------------------------------------------
 
+// TestEmptyToken_StillSendsRequest verifies that token validation is the provider's
+// responsibility, not the client's, and that the server's 401 still surfaces as an error.
 func TestEmptyToken_StillSendsRequest(t *testing.T) {
-	// The client itself doesn't validate the token — that's the provider's job.
-	// Confirm that an empty token still sends a request (with whatever
-	// Authorization header results) and that the server's 401 surfaces as an
-	// error. Use an atomic to avoid a data race between the handler goroutine
-	// (writer) and the test goroutine (reader).
 	var requestReceived atomic.Bool
 	srv, _ := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		requestReceived.Store(true)
-		// Log what was actually sent so failures are easy to diagnose.
-		t.Logf("Authorization header received: %q", r.Header.Get("Authorization"))
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"message": "no token"})
 	})
 	c := client.New(srv.URL, "", 0)

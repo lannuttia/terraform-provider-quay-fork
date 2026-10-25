@@ -44,8 +44,7 @@ func (c *Client) CreateRepository(ctx context.Context, req CreateRepositoryReque
 	if err := c.post(ctx, "repository", req, nil); err != nil {
 		return nil, fmt.Errorf("creating repository %q: %w", req.Repository, err)
 	}
-	// Quay's POST response omits is_public, so a GET is required to read back
-	// the actual visibility rather than always seeing false.
+	// Quay's POST /repository response omits is_public, so the actual visibility must be fetched.
 	repo, err := c.GetRepository(ctx, fmt.Sprintf("%s/%s", req.Namespace, req.Repository))
 	if err != nil {
 		return nil, fmt.Errorf("repository %q was already created but could not be read back: %w", req.Repository, err)
@@ -99,10 +98,9 @@ type tagListResponse struct {
 }
 
 // HasRepositoryTags reports whether the repository has at least one active tag.
-// It returns (false, nil) when the repository does not exist (404).
-// Only active tags are counted; deleted tags that are still within the
-// tag_expiration_s restore window are not included, so a repository that
-// appears empty may still have restorable content that is lost on deletion.
+// Returns (false, nil) for a missing repository. Deleted tags within the
+// tag_expiration_s restore window are not counted, so a repository that appears
+// empty may still have restorable content that is permanently lost on deletion.
 func (c *Client) HasRepositoryTags(ctx context.Context, repository string) (bool, error) {
 	path := fmt.Sprintf("repository/%s/tag/?onlyActiveTags=true&limit=1", repository)
 	var resp tagListResponse
@@ -115,18 +113,15 @@ func (c *Client) HasRepositoryTags(ctx context.Context, repository string) (bool
 	return len(resp.Tags) > 0, nil
 }
 
-// NamespaceExists reports whether the given namespace exists as either a Quay
-// organisation or a Quay user account. It returns (true, nil) when either
-// GET /organization/<name> or GET /users/<name> succeeds (200). It returns
-// (false, nil) when both return 404. Any other error is returned as-is.
+// NamespaceExists reports whether the given namespace exists as a Quay
+// organisation or user account. Returns (false, nil) only when both lookups
+// return 404.
 //
-// This is used by Read to disambiguate a 403 on a repository: a 403 from a
-// user-namespace repository is a genuine permissions error (the namespace
-// still exists), whereas a 403 from a repo whose org namespace has been
-// deleted out-of-band means the resource is gone. Checking only the org
-// endpoint misclassifies user-namespace repositories as gone.
+// A 403 on a repository in a user namespace is a genuine permissions error,
+// not a signal that the namespace is gone. Checking only the org endpoint
+// misclassifies user-namespace repositories as deleted because GetOrganization
+// always returns 404 for user accounts.
 func (c *Client) NamespaceExists(ctx context.Context, name string) (bool, error) {
-	// Check organisation namespace first.
 	err := c.get(ctx, fmt.Sprintf("organization/%s", name), nil)
 	if err == nil {
 		return true, nil
@@ -135,7 +130,6 @@ func (c *Client) NamespaceExists(ctx context.Context, name string) (bool, error)
 		return false, err
 	}
 
-	// Fall through to user namespace.
 	err = c.get(ctx, fmt.Sprintf("users/%s", name), nil)
 	if err == nil {
 		return true, nil
@@ -152,11 +146,10 @@ type repoListResponse struct {
 	Repositories []map[string]any `json:"repositories"`
 }
 
-// HasOrganizationRepositories reports whether the organization namespace
-// contains at least one image repository. Quay's list endpoint returns only
-// image repositories by default, so an org that has robots, teams or OAuth
-// applications but no repos is reported as empty and will be deleted along
-// with those resources.
+// HasOrganizationRepositories reports whether the organization contains at least
+// one image repository. Robots, teams and OAuth applications are not counted
+// because Quay's list endpoint returns image repositories only, so an org with
+// those but no repos will be deleted along with them without triggering the guard.
 func (c *Client) HasOrganizationRepositories(ctx context.Context, name string) (bool, error) {
 	path := fmt.Sprintf("repository?namespace=%s", url.QueryEscape(name))
 	var resp repoListResponse

@@ -86,11 +86,8 @@ resource "quay_repository_notification" "bad" {
 	})
 }
 
-// TestAccRepositoryNotification_VulnerabilityLevelUnknownStringRejected asserts
-// that an unrecognised severity string is rejected at plan time by the OneOf
-// validator. The level attribute now accepts the canonical Quay severity names
-// ("Critical", "High", "Medium", "Low", "Negligible", "Unknown") — not
-// arbitrary strings or the old integer index.
+// TestAccRepositoryNotification_VulnerabilityLevelUnknownStringRejected asserts that
+// unrecognised severity strings are rejected at plan time.
 func TestAccRepositoryNotification_VulnerabilityLevelUnknownStringRejected(t *testing.T) {
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: providerFactories(),
@@ -111,10 +108,8 @@ resource "quay_repository_notification" "bad" {
 	})
 }
 
-// TestAccRepositoryNotification_VulnerabilityLevelIntegerRejected asserts that
-// a bare integer is no longer accepted for vulnerability_found.level. HCL
-// coerces it to a string (e.g. "6") which the OneOf validator then rejects as
-// not being a valid severity name.
+// TestAccRepositoryNotification_VulnerabilityLevelIntegerRejected asserts that a bare
+// integer is rejected. HCL coerces it to a string that the OneOf validator rejects.
 func TestAccRepositoryNotification_VulnerabilityLevelIntegerRejected(t *testing.T) {
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: providerFactories(),
@@ -135,11 +130,10 @@ resource "quay_repository_notification" "bad" {
 	})
 }
 
-// TestAccRepositoryNotification_QuayNotificationMissingTarget asserts that
-// supplying a quay_notification block without a target is rejected at plan
-// time. Without a target the Quay API always returns 400 "Missing target",
-// so the schema enforces it as Required to surface the error before any API
-// call is made.
+// TestAccRepositoryNotification_QuayNotificationMissingTarget asserts that a
+// quay_notification block without a target is rejected at plan time. Quay
+// returns 400 "Missing target" at apply time; the schema makes it Required
+// to surface the error earlier.
 func TestAccRepositoryNotification_QuayNotificationMissingTarget(t *testing.T) {
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: providerFactories(),
@@ -160,12 +154,9 @@ resource "quay_repository_notification" "bad" {
 	})
 }
 
-// TestAccRepositoryNotification_DeletedOutOfBandRemovesFromState verifies that
-// when a notification is deleted out-of-band, a subsequent refresh removes it
-// from state rather than erroring. Read uses the repository list endpoint to
-// find the notification by uuid within the correct repository context, so a
-// missing notification is correctly detected even when Quay returns 400 (not
-// 404) for a GET on a deleted notification uuid.
+// TestAccRepositoryNotification_DeletedOutOfBandRemovesFromState verifies that an
+// out-of-band delete is detected on the next refresh. Quay returns 400 (not 404)
+// for a missing notification uuid, so Read uses the list endpoint instead.
 func TestAccRepositoryNotification_DeletedOutOfBandRemovesFromState(t *testing.T) {
 	skipIfNoAcc(t)
 	orgName := rname("tf-acc-notif-oob-org")
@@ -200,12 +191,8 @@ resource "quay_repository_notification" "test" {
 					resource.TestCheckResourceAttrSet("quay_repository_notification.test", "uuid"),
 				),
 			},
-			// Delete the notification out-of-band. A subsequent refresh must
-			// remove it from state without error.
 			{
 				PreConfig: func() {
-					rs := resource.TestCheckResourceAttrSet("quay_repository_notification.test", "uuid")
-					_ = rs
 					c := quayClient()
 					ctx := context.Background()
 					// Retrieve the uuid from the list endpoint to delete it.

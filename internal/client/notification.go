@@ -9,8 +9,8 @@ import (
 // EventConfig holds the event-specific configuration returned by the Quay API.
 type EventConfig map[string]any
 
-// vulnerabilityLevels maps the Quay severity name to its API integer index.
-// Order is significant: position == index.
+// vulnerabilityLevels maps Quay severity names to their API integer index.
+// Position equals index, so the slice must not be reordered.
 var vulnerabilityLevels = []string{
 	"Critical",
 	"High",
@@ -69,7 +69,7 @@ type Notification struct {
 }
 
 // CreateNotificationRequest is the request body for creating a notification.
-// The Quay API uses camelCase "eventConfig" in requests but "event_config" in responses.
+// Quay uses camelCase "eventConfig" in requests but "event_config" in responses.
 type CreateNotificationRequest struct {
 	Event       string         `json:"event"`
 	Method      string         `json:"method"`
@@ -99,9 +99,7 @@ func (c *Client) ListRepoNotifications(ctx context.Context, repository string) (
 	return resp.Notifications, nil
 }
 
-// GetRepoNotification finds a notification by uuid from the repository's
-// notification list. Using the list endpoint ensures the notification is
-// verified within the correct repository context.
+// GetRepoNotification finds a notification by uuid within the correct repository context.
 func (c *Client) GetRepoNotification(ctx context.Context, repository, uuid string) (*Notification, error) {
 	notifs, err := c.ListRepoNotifications(ctx, repository)
 	if err != nil {
@@ -120,8 +118,7 @@ func (c *Client) DeleteRepoNotification(ctx context.Context, repository, uuid st
 	if err == nil {
 		return nil
 	}
-	// Quay returns 400 "No repository notification found" when the notification
-	// is already gone, rather than 404.
+	// Quay returns 400 "No repository notification found" for a missing notification, not 404.
 	if IsNotFound(err) {
 		return nil
 	}

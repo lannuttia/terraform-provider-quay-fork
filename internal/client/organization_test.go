@@ -11,17 +11,14 @@ import (
 	"github.com/quay/terraform-provider-quay/internal/client"
 )
 
-// boolPtr and intPtr are helpers for constructing pointer-typed Organization
-// fields in test literals.
+// boolPtr, intPtr and strPtr construct pointer-typed Organization fields in test literals.
 func boolPtr(b bool) *bool    { return &b }
 func intPtr(i int) *int       { return &i }
 func strPtr(s string) *string { return &s }
 
-// TestOrganization_MarshalZeroValues ensures that zero/false values on the
-// Organization response struct are preserved when the struct is marshalled to
-// JSON. Fields tagged with omitempty silently drop false booleans, empty
-// strings, and zero integers, which corrupts any downstream code that
-// re-serialises the struct (e.g. caching, logging, or future client features).
+// TestOrganization_MarshalZeroValues ensures zero/false values survive JSON
+// round-tripping. omitempty silently drops them, breaking any code that
+// re-serialises the struct or relies on the zero value being present.
 func TestOrganization_MarshalZeroValues(t *testing.T) {
 	org := client.Organization{
 		Name:                "myorg",
@@ -42,7 +39,6 @@ func TestOrganization_MarshalZeroValues(t *testing.T) {
 		t.Fatalf("unexpected unmarshal error: %v", err)
 	}
 
-	// Pointer fields with non-nil values must appear in the JSON output.
 	requiredKeys := []string{
 		"invoice_email",
 		"invoice_email_address",
@@ -140,10 +136,8 @@ func TestDeleteOrganization(t *testing.T) {
 	}
 }
 
-// TestUpdateOrganization_InvoiceEmailFalse ensures that false is included in
-// the PUT request body when invoice_email is set to false. Previously omitempty
-// on the bool field caused false to be silently dropped, so Quay kept the old
-// value instead of disabling invoice emails.
+// TestUpdateOrganization_InvoiceEmailFalse ensures false is sent in the PUT body.
+// omitempty on a bool field silently drops false, so Quay keeps the old value.
 func TestUpdateOrganization_InvoiceEmailFalse(t *testing.T) {
 	var gotBody map[string]any
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
@@ -173,12 +167,8 @@ func TestUpdateOrganization_InvoiceEmailFalse(t *testing.T) {
 	}
 }
 
-// TestUpdateOrganization_EmailEmpty ensures that an empty string is included in
-// the PUT request body when email is explicitly set to "". The Quay API treats
-// an empty email as a request to clear the field (it stores a random UUID
-// internally and returns "" on subsequent GETs). With omitempty on the field
-// the empty string is silently dropped, making it impossible to clear the email
-// through the provider.
+// TestUpdateOrganization_EmailEmpty ensures an empty string is sent in the PUT body.
+// Quay treats "" as a request to clear the field; omitempty drops it silently.
 func TestUpdateOrganization_EmailEmpty(t *testing.T) {
 	var gotBody map[string]any
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
@@ -208,12 +198,8 @@ func TestUpdateOrganization_EmailEmpty(t *testing.T) {
 	}
 }
 
-// TestUpdateOrganization_InvoiceEmailAddressEmpty ensures that an empty string
-// is included in the PUT request body when invoice_email_address is explicitly
-// set to "". The Quay API schema marks this field as nullable (type:
-// ["string","null"]), so sending "" clears it. With omitempty on the field the
-// empty string is silently dropped, making it impossible to clear the address
-// through the provider.
+// TestUpdateOrganization_InvoiceEmailAddressEmpty ensures an empty string is sent in the PUT body.
+// The Quay API schema marks this field nullable; omitempty drops "" silently.
 func TestUpdateOrganization_InvoiceEmailAddressEmpty(t *testing.T) {
 	var gotBody map[string]any
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
@@ -243,10 +229,8 @@ func TestUpdateOrganization_InvoiceEmailAddressEmpty(t *testing.T) {
 	}
 }
 
-// TestUpdateOrganization_TagExpirationZero ensures that 0 is included in the
-// PUT request body when tag_expiration_s is set to 0. Previously omitempty on
-// the int field caused 0 to be silently dropped, preventing users from
-// clearing the tag expiration.
+// TestUpdateOrganization_TagExpirationZero ensures 0 is sent in the PUT body.
+// omitempty on an int field silently drops 0, preventing users from clearing the expiration.
 func TestUpdateOrganization_TagExpirationZero(t *testing.T) {
 	var gotBody map[string]any
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
@@ -276,13 +260,9 @@ func TestUpdateOrganization_TagExpirationZero(t *testing.T) {
 	}
 }
 
-// TestCreateOrganization_GetFailsAfterPost simulates a transient failure on
-// the follow-up GET that CreateOrganization issues after a successful POST.
-// The Quay POST /organization/ endpoint returns an empty 201 body, so the GET
-// is unavoidable. However, when the GET fails the error must make it clear
-// that the organization was already created — otherwise operators will re-run
-// apply, hit a 409 conflict, and be left with an orphaned resource and no
-// Terraform state entry.
+// TestCreateOrganization_GetFailsAfterPost verifies the error message makes clear the org
+// was already created. Without that, operators re-run apply, hit a 409 conflict, and are
+// left with an orphaned resource and no Terraform state entry.
 func TestCreateOrganization_GetFailsAfterPost(t *testing.T) {
 	postCalled := false
 	getCalled := false
@@ -313,8 +293,6 @@ func TestCreateOrganization_GetFailsAfterPost(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error when GET fails after POST, got nil")
 	}
-	// The error message must warn the operator that the organization was
-	// already created, so they know not to re-run apply without checking.
 	if !strings.Contains(err.Error(), "already created") {
 		t.Errorf("error should mention that the org was already created; got: %v", err)
 	}

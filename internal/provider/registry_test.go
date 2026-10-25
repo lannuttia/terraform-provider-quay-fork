@@ -13,10 +13,8 @@ import (
 	"testing"
 )
 
-// registryBearerToken fetches a Docker V2 bearer token from the test Quay
-// instance's token endpoint, scoped to push+pull on the given repository.
-// Quay's registry auth requires basic auth with the actual username+password,
-// not the OAuth token.
+// registryBearerToken fetches a Docker V2 bearer token scoped to push+pull on the given repository.
+// Quay's registry auth requires basic auth with the username and password, not the OAuth token.
 func registryBearerToken(t *testing.T, repository string) string {
 	t.Helper()
 
@@ -50,12 +48,9 @@ func registryBearerToken(t *testing.T, repository string) string {
 	return result.Token
 }
 
-// pushImageToQuay pushes a minimal scratch image into the test Quay instance
-// by speaking the Docker V2 HTTP API directly against testState.quayURL.
-// Going through the Docker daemon is not viable because Quay's WWW-Authenticate
-// realm always advertises SERVER_HOSTNAME (localhost:8080), while the container
-// port is mapped to a random host port — the daemon follows that stale realm
-// and fails to fetch a token.
+// pushImageToQuay pushes a minimal scratch image into the test Quay instance via the Docker V2 HTTP API.
+// The Docker daemon cannot be used because Quay's WWW-Authenticate realm advertises
+// SERVER_HOSTNAME (localhost:8080), which differs from the mapped host port.
 func pushImageToQuay(t *testing.T, repository, tag string) {
 	t.Helper()
 
@@ -86,9 +81,7 @@ func pushImageToQuay(t *testing.T, repository, tag string) {
 
 	mustClose := func(r io.Closer) { _ = r.Close() }
 
-	// rewriteLocation rewrites any Location header returned by Quay to use
-	// testState.quayURL. Quay's Location headers use SERVER_HOSTNAME
-	// (localhost:8080) which is the internal port, not the mapped host port.
+	// Quay's Location headers use SERVER_HOSTNAME (localhost:8080), not the mapped host port.
 	rewriteLocation := func(location string) string {
 		parsed, err := url.Parse(location)
 		if err != nil {

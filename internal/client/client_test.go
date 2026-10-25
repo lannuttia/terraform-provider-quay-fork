@@ -12,9 +12,7 @@ import (
 	"github.com/quay/terraform-provider-quay/internal/client"
 )
 
-// newTestServer starts an httptest server. The handler receives the full request
-// and writes a JSON response. It returns the server and a *client.Client pointed
-// at it with retry delays set to zero so tests run at full speed.
+// newTestServer starts an httptest server and returns a Client pointed at it with zero retry delay.
 func newTestServer(t *testing.T, handler http.HandlerFunc) (*httptest.Server, *client.Client) {
 	t.Helper()
 	srv := httptest.NewServer(handler)
@@ -22,7 +20,7 @@ func newTestServer(t *testing.T, handler http.HandlerFunc) (*httptest.Server, *c
 	return srv, client.NewTestClient(srv.URL, "test-token")
 }
 
-// writeJSON is a helper that serialises v as JSON and writes it with status code.
+// writeJSON serialises v as JSON and writes it with the given status code.
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -74,8 +72,7 @@ func TestTimeout(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected timeout error, got nil")
 	}
-	// The error should be a context / deadline exceeded or a net timeout — not
-	// an APIError, since the server never responded.
+	// A timeout produces a transport-level error, not an APIError.
 	var apiErr *client.APIError
 	if errors.As(err, &apiErr) {
 		t.Errorf("expected a transport-level timeout error, got APIError: %v", apiErr)
@@ -84,7 +81,7 @@ func TestTimeout(t *testing.T) {
 
 // ----- Retry behaviour ----------------------------------------------------
 
-// TestRetry_GET5xx verifies that GET requests are retried on transient 5xx errors.
+// TestRetry_GET5xx verifies that GET requests are retried on transient 5xx responses.
 func TestRetry_GET5xx(t *testing.T) {
 	attempts := 0
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
@@ -104,8 +101,8 @@ func TestRetry_GET5xx(t *testing.T) {
 	}
 }
 
-// TestRetry_POST5xx verifies that POST requests are NOT retried on 5xx errors,
-// since a committed POST may have already mutated server state.
+// TestRetry_POST5xx verifies that POST requests are not retried on 5xx errors
+// because a committed POST may have already mutated server state.
 func TestRetry_POST5xx(t *testing.T) {
 	attempts := 0
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
@@ -121,8 +118,7 @@ func TestRetry_POST5xx(t *testing.T) {
 	}
 }
 
-// TestRetry_429 verifies that 429 Too Many Requests is not retried, since
-// retrying immediately would only worsen the rate limiting situation.
+// TestRetry_429 verifies that 429 Too Many Requests is not retried.
 func TestRetry_429(t *testing.T) {
 	attempts := 0
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
@@ -140,18 +136,13 @@ func TestRetry_429(t *testing.T) {
 
 // ----- Redirect behaviour -------------------------------------------------
 
-// TestRedirect_NonGETRefused verifies that redirects on non-GET requests are
-// refused. Without a CheckRedirect handler, Go follows the redirect and changes
-// the method to GET, so a redirected DELETE returns 200 while nothing is
-// deleted. The client should return an error instead.
+// TestRedirect_NonGETRefused verifies that redirects on non-GET requests are refused.
 func TestRedirect_NonGETRefused(t *testing.T) {
-	// Target server: responds 200 to anything — represents the redirect destination.
 	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{})
 	}))
 	t.Cleanup(target.Close)
 
-	// Origin server: redirects every request to the target.
 	origin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, target.URL+r.URL.Path, http.StatusMovedPermanently)
 	}))
@@ -164,8 +155,7 @@ func TestRedirect_NonGETRefused(t *testing.T) {
 	}
 }
 
-// TestRedirect_GETAllowed verifies that redirects on GET requests are still
-// followed normally.
+// TestRedirect_GETAllowed verifies that GET redirects are followed normally.
 func TestRedirect_GETAllowed(t *testing.T) {
 	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, client.Repository{Namespace: "org", Name: "repo"})
@@ -184,22 +174,18 @@ func TestRedirect_GETAllowed(t *testing.T) {
 	}
 }
 
-// TestRedirect_GETStripsAuthOnDowngrade verifies that the Authorization header
-// is not forwarded when a GET redirect downgrades from https to http. Go
-// strips the header by default on cross-host redirects, but same-host
-// https->http redirects still carry the token, leaking the bearer credential
-// over plaintext.
+// TestRedirect_GETStripsAuthOnDowngrade verifies that Authorization is not forwarded
+// on an https->http redirect. Go strips it on cross-host redirects but not on
+// same-host downgrades, which would leak the bearer token in plaintext.
 func TestRedirect_GETStripsAuthOnDowngrade(t *testing.T) {
 	var receivedAuth string
 
-	// Target: plain HTTP — records whether it received an Authorization header.
 	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedAuth = r.Header.Get("Authorization")
 		writeJSON(w, http.StatusOK, client.Repository{Namespace: "org", Name: "repo"})
 	}))
 	t.Cleanup(target.Close)
 
-	// Origin: TLS server that redirects to the plain-HTTP target.
 	origin := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, target.URL+r.URL.Path, http.StatusMovedPermanently)
 	}))
@@ -213,8 +199,7 @@ func TestRedirect_GETStripsAuthOnDowngrade(t *testing.T) {
 	}
 }
 
-// TestHTTPURLRejected verifies that configuring the provider with an http://
-// URL is rejected, since the bearer token would be sent in plaintext.
+// TestHTTPURLRejected verifies that http:// URLs are rejected to prevent the bearer token leaking in plaintext.
 func TestHTTPURLRejected(t *testing.T) {
 	err := client.ValidateURL("http://quay.example.com")
 	if err == nil {
@@ -222,15 +207,13 @@ func TestHTTPURLRejected(t *testing.T) {
 	}
 }
 
-// TestHTTPSURLAccepted verifies that https:// URLs are accepted.
 func TestHTTPSURLAccepted(t *testing.T) {
 	if err := client.ValidateURL("https://quay.example.com"); err != nil {
 		t.Errorf("unexpected error for https:// URL: %v", err)
 	}
 }
 
-// TestEmptyURLAccepted verifies that an empty URL is accepted (defaults to
-// https://quay.io).
+// TestEmptyURLAccepted verifies that an empty URL defaults to https://quay.io.
 func TestEmptyURLAccepted(t *testing.T) {
 	if err := client.ValidateURL(""); err != nil {
 		t.Errorf("unexpected error for empty URL: %v", err)

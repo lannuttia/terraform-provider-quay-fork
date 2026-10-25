@@ -9,7 +9,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-testing/terraform"
 )
 
-// notificationImportID builds the import ID (namespace/name/uuid) from state.
+// notificationImportID builds the import ID from state attributes.
 func notificationImportID(resourceName string) resource.ImportStateIdFunc {
 	return func(s *terraform.State) (string, error) {
 		r, ok := s.RootModule().Resources[resourceName]
@@ -48,9 +48,6 @@ resource "quay_organization" "test" {
 				),
 			},
 			{
-				// Keep the resource alive by including its config, and import
-				// it by ID. The framework will not destroy between steps when
-				// Config is set.
 				Config:            cfg,
 				ResourceName:      "quay_organization.test",
 				ImportState:       true,
@@ -314,18 +311,11 @@ resource "quay_repository_notification" "test" {
 	})
 }
 
-// TestAccRepositoryNotification_generateConfig is intentionally absent.
-// Terraform's GenerateConfig redacts Sensitive: true attributes, so the
-// generated HCL is missing Required fields such as webhook.url and slack.url,
-// causing the subsequent plan to fail. The importCommand and importBlock tests
-// above cover import behaviour without this constraint.
+// TestAccRepositoryNotification_generateConfig is absent because GenerateConfig
+// redacts Sensitive attributes, omitting Required fields like webhook.url and
+// causing the subsequent plan to fail.
 
-// ---------------------------------------------------------------------------
-// Import error cases
-// ---------------------------------------------------------------------------
-
-// quay_repository requires a "namespace/name" import ID.
-// These tests verify that malformed IDs are rejected with a clear error.
+// quay_repository requires a "namespace/name" import ID; malformed IDs must be rejected.
 
 func TestAccRepository_importInvalidID_noSeparator(t *testing.T) {
 	skipIfNoAcc(t)
@@ -428,8 +418,6 @@ resource "quay_repository" "test" {
 		},
 	})
 }
-
-// quay_repository_notification requires a "namespace/repo/uuid" import ID.
 
 func TestAccRepositoryNotification_importInvalidID_twoPartsOnly(t *testing.T) {
 	skipIfNoAcc(t)

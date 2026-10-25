@@ -11,7 +11,7 @@ import (
 	provider "github.com/quay/terraform-provider-quay/internal/provider"
 )
 
-// schemaFor returns the schema of a resource produced by the given factory.
+// schemaFor returns the schema of the resource produced by the given factory.
 func schemaFor(t *testing.T, factory func() fwresource.Resource) schema.Schema {
 	t.Helper()
 	r := factory()
@@ -20,8 +20,7 @@ func schemaFor(t *testing.T, factory func() fwresource.Resource) schema.Schema {
 	return resp.Schema
 }
 
-// nestedAttr walks a dot-separated path through a schema and returns the leaf
-// attribute. It understands SingleNestedAttribute as an intermediate node.
+// nestedAttr walks a path through a schema and returns the leaf attribute.
 func nestedAttr(t *testing.T, s schema.Schema, path ...string) schema.Attribute {
 	t.Helper()
 	var cur schema.Attribute
@@ -43,13 +42,9 @@ func nestedAttr(t *testing.T, s schema.Schema, path ...string) schema.Attribute 
 	return cur
 }
 
-// TestNotificationSchema_QuayNotificationTarget asserts that the
-// quay_notification method block has a required nested "target" attribute
-// containing "kind" and "name" child attributes.
-//
-// Without a target the Quay API always returns 400 "Missing target", so
-// accepting a quay_notification block with no target means creates always fail
-// with an opaque API error — not a clear plan-time validation message.
+// TestNotificationSchema_QuayNotificationTarget asserts that quay_notification
+// has a required nested "target" with "kind" and "name". Without it, Quay
+// returns 400 "Missing target" rather than a plan-time validation error.
 func TestNotificationSchema_QuayNotificationTarget(t *testing.T) {
 	s := schemaFor(t, provider.NewRepositoryNotificationResource)
 
@@ -63,10 +58,9 @@ func TestNotificationSchema_QuayNotificationTarget(t *testing.T) {
 		t.Fatalf("quay_notification: expected schema.SingleNestedAttribute, got %T", qnRaw)
 	}
 
-	// It must contain a "target" child attribute.
 	targetRaw, ok := qn.Attributes["target"]
 	if !ok {
-		t.Fatal("quay_notification.target attribute is missing — Quay returns 400 \"Missing target\" when no target is provided")
+		t.Fatal("quay_notification.target attribute is missing — Quay returns 400 \"Missing target\" when absent")
 	}
 
 	target, ok := targetRaw.(schema.SingleNestedAttribute)
@@ -95,13 +89,9 @@ func TestNotificationSchema_QuayNotificationTarget(t *testing.T) {
 	}
 }
 
-// TestNotificationSchema_SensitiveFields asserts that credential-bearing
-// attributes in the notification schema are marked Sensitive so Terraform
-// redacts them in plan/apply output and encrypts them in state.
-//
-// A Slack incoming-webhook URL is the credential itself; webhook URLs frequently
-// embed tokens. Without Sensitive: true these values appear in every plan diff
-// and CI log.
+// TestNotificationSchema_SensitiveFields asserts that credential-bearing attributes
+// are marked Sensitive. A Slack webhook URL is itself the credential; without
+// Sensitive: true it appears in every plan diff and CI log.
 func TestNotificationSchema_SensitiveFields(t *testing.T) {
 	s := schemaFor(t, provider.NewRepositoryNotificationResource)
 
@@ -125,11 +115,9 @@ func TestNotificationSchema_SensitiveFields(t *testing.T) {
 	}
 }
 
-// TestNotificationSchema_VulnerabilityLevelIsOptionalString asserts that the
-// vulnerability_found.level attribute is an Optional StringAttribute. It must
-// be Optional (not Required) because Quay treats a missing level as "any
-// severity", and the Quay UI creates notifications without a level. Making it
-// Required would prevent importing those notifications.
+// TestNotificationSchema_VulnerabilityLevelIsOptionalString asserts that
+// vulnerability_found.level is Optional. Quay treats a missing level as "any severity"
+// and the UI omits it; Required would prevent importing those notifications.
 func TestNotificationSchema_VulnerabilityLevelIsOptionalString(t *testing.T) {
 	s := schemaFor(t, provider.NewRepositoryNotificationResource)
 	attr := nestedAttr(t, s, "vulnerability_found", "level")
@@ -145,8 +133,7 @@ func TestNotificationSchema_VulnerabilityLevelIsOptionalString(t *testing.T) {
 	}
 }
 
-// TestNotificationSchema_VulnerabilityLevelOmittedAccepted asserts that omitting
-// level entirely from a vulnerability_found block is accepted at plan time.
+// TestNotificationSchema_VulnerabilityLevelOmittedAccepted asserts that omitting level is valid at plan time.
 func TestNotificationSchema_VulnerabilityLevelOmittedAccepted(t *testing.T) {
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: providerFactories(),
@@ -167,10 +154,8 @@ resource "quay_repository_notification" "test" {
 	})
 }
 
-// TestNotificationSchema_VulnerabilityLevelRejectsInteger asserts that passing
-// an integer for vulnerability_found.level is rejected at plan time. HCL
-// coerces bare integers to strings for StringAttribute, so "1" passes the type
-// check but is rejected by the OneOf validator as not being a valid severity name.
+// TestNotificationSchema_VulnerabilityLevelRejectsInteger asserts that an integer level
+// is rejected at plan time. HCL coerces it to a string, which the OneOf validator rejects.
 func TestNotificationSchema_VulnerabilityLevelRejectsInteger(t *testing.T) {
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: providerFactories(),
@@ -191,8 +176,7 @@ resource "quay_repository_notification" "bad" {
 	})
 }
 
-// TestNotificationSchema_VulnerabilityLevelRejectsUnknownString asserts that
-// an unrecognised severity string is rejected at plan time.
+// TestNotificationSchema_VulnerabilityLevelRejectsUnknownString asserts that unrecognised strings are rejected at plan time.
 func TestNotificationSchema_VulnerabilityLevelRejectsUnknownString(t *testing.T) {
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: providerFactories(),
@@ -213,10 +197,8 @@ resource "quay_repository_notification" "bad" {
 	})
 }
 
-// TestNotificationSchema_QuayNotificationKindValidator asserts that
-// quay_notification.target.kind is validated as either "user" or "team" at
-// plan time. Without this, an invalid kind (e.g. "org") is accepted by
-// Terraform but rejected by the Quay API with an opaque error at apply time.
+// TestNotificationSchema_QuayNotificationKindValidator asserts that an invalid kind
+// is rejected at plan time rather than by the Quay API at apply time.
 func TestNotificationSchema_QuayNotificationKindValidator(t *testing.T) {
 	s := schemaFor(t, provider.NewRepositoryNotificationResource)
 	attr := nestedAttr(t, s, "quay_notification", "target", "kind")
@@ -226,12 +208,11 @@ func TestNotificationSchema_QuayNotificationKindValidator(t *testing.T) {
 		t.Fatalf("quay_notification.target.kind: expected schema.StringAttribute, got %T", attr)
 	}
 	if len(strAttr.Validators) == 0 {
-		t.Error("quay_notification.target.kind: no validators defined — invalid values like \"org\" are silently accepted at plan time and only rejected by the Quay API at apply time")
+		t.Error("quay_notification.target.kind: no validators defined — invalid values are silently accepted at plan time")
 	}
 }
 
-// TestNotificationSchema_QuayNotificationKindRejectsInvalidValue asserts that
-// an invalid kind is rejected at plan time.
+// TestNotificationSchema_QuayNotificationKindRejectsInvalidValue asserts that an invalid kind is rejected at plan time.
 func TestNotificationSchema_QuayNotificationKindRejectsInvalidValue(t *testing.T) {
 	resource.UnitTest(t, resource.TestCase{
 		ProtoV6ProviderFactories: providerFactories(),
@@ -252,8 +233,7 @@ resource "quay_repository_notification" "bad" {
 	})
 }
 
-// TestNotificationSchema_QuayNotificationKindAcceptsValidValues asserts that
-// "user" and "team" are both accepted at plan time.
+// TestNotificationSchema_QuayNotificationKindAcceptsValidValues asserts that "user" and "team" are valid at plan time.
 func TestNotificationSchema_QuayNotificationKindAcceptsValidValues(t *testing.T) {
 	for _, kind := range []string{"user", "team"} {
 		t.Run(kind, func(t *testing.T) {
@@ -279,8 +259,7 @@ resource "quay_repository_notification" "test" {
 	}
 }
 
-// TestNotificationSchema_VulnerabilityLevelAcceptsValidStrings asserts that
-// each canonical Quay severity name is accepted at plan time.
+// TestNotificationSchema_VulnerabilityLevelAcceptsValidStrings asserts that each canonical severity name is valid at plan time.
 func TestNotificationSchema_VulnerabilityLevelAcceptsValidStrings(t *testing.T) {
 	levels := []string{"Critical", "High", "Medium", "Low", "Negligible", "Unknown"}
 	for _, level := range levels {
@@ -298,8 +277,6 @@ resource "quay_repository_notification" "test" {
   vulnerability_found = { level = "` + level + `" }
 }
 `,
-						// No ExpectError — plan should succeed. Apply will fail
-						// (no live Quay), but we only check plan here.
 						ExpectError: regexp.MustCompile(`(?i)(404|not found|Error Creating)`),
 					},
 				},

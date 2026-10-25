@@ -12,8 +12,7 @@ import (
 	provider "github.com/quay/terraform-provider-quay/internal/provider"
 )
 
-// importNotificationState calls ImportState on a freshly-constructed
-// RepositoryNotificationResource and returns the resulting state response.
+// importNotificationState calls ImportState and returns the resulting state response.
 func importNotificationState(t *testing.T, importID string) *fwresource.ImportStateResponse {
 	t.Helper()
 	ctx := context.Background()
@@ -35,7 +34,7 @@ func importNotificationState(t *testing.T, importID string) *fwresource.ImportSt
 	return resp
 }
 
-// getStringAttr reads a single string attribute from an ImportStateResponse.
+// getStringAttr reads a string attribute from an ImportStateResponse.
 func getStringAttr(t *testing.T, resp *fwresource.ImportStateResponse, attr string) string {
 	t.Helper()
 	ctx := context.Background()
@@ -47,9 +46,8 @@ func getStringAttr(t *testing.T, resp *fwresource.ImportStateResponse, attr stri
 	return v.ValueString()
 }
 
-// TestRepositoryNotificationImport_SetsCorrectAttributes verifies that
-// ImportState parses the 3-part import ID (namespace/repo/uuid) and sets
-// namespace, name, uuid, and id to the correct values.
+// TestRepositoryNotificationImport_SetsCorrectAttributes verifies that the 3-part
+// import ID is parsed and all attributes are set correctly.
 func TestRepositoryNotificationImport_SetsCorrectAttributes(t *testing.T) {
 	const (
 		namespace = "myorg"
@@ -79,9 +77,8 @@ func TestRepositoryNotificationImport_SetsCorrectAttributes(t *testing.T) {
 	}
 }
 
-// TestRepositoryNotificationImport_IDDerivedFromParts verifies that id in
-// import state equals namespace+"/"+name+"/"+uuid derived from the parsed
-// parts, not the raw req.ID string.
+// TestRepositoryNotificationImport_IDDerivedFromParts verifies that id is derived from
+// the parsed parts rather than passed through verbatim from the raw import ID.
 func TestRepositoryNotificationImport_IDDerivedFromParts(t *testing.T) {
 	const importID = "myorg/myrepo/32bb0ef6-ad69-4ccb-b64e-ddbc8bfd444d"
 
@@ -98,16 +95,11 @@ func TestRepositoryNotificationImport_IDDerivedFromParts(t *testing.T) {
 	canonical := gotNamespace + "/" + gotName + "/" + gotUUID
 
 	if gotID != canonical {
-		t.Errorf(
-			"id %q does not equal namespace+\"/\"+name+\"/\"+uuid %q\n"+
-				"id must be derived from the parsed parts, not passed through verbatim from the import ID string",
-			gotID, canonical,
-		)
+		t.Errorf("id %q does not equal namespace+\"/\"+name+\"/\"+uuid %q", gotID, canonical)
 	}
 }
 
-// TestRepositoryNotificationImport_IDNotSetDirectlyFromReqID pins the contract
-// that id == namespace+"/"+name+"/"+uuid across different import ID shapes.
+// TestRepositoryNotificationImport_IDNotSetDirectlyFromReqID pins id == namespace+"/"+name+"/"+uuid across import ID shapes.
 func TestRepositoryNotificationImport_IDNotSetDirectlyFromReqID(t *testing.T) {
 	cases := []struct {
 		name          string
@@ -156,7 +148,7 @@ func TestRepositoryNotificationImport_IDNotSetDirectlyFromReqID(t *testing.T) {
 
 			wantID := tc.wantNamespace + "/" + tc.wantName + "/" + tc.wantUUID
 			if gotID != wantID {
-				t.Errorf("id: want %q (namespace+\"/\"+name+\"/\"+uuid), got %q", wantID, gotID)
+				t.Errorf("id: want %q, got %q", wantID, gotID)
 			}
 		})
 	}

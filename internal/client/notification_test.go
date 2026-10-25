@@ -43,10 +43,8 @@ func TestCreateRepoNotification(t *testing.T) {
 	if !created {
 		t.Error("POST notification endpoint was never called")
 	}
-	// Quay's POST /notification/ returns the full notification object, so a
-	// follow-up GET opens an orphan window: if the GET fails after a
-	// successful POST, the notification fires indefinitely with no Terraform
-	// state entry tracking it.
+	// A GET after POST opens an orphan window: if the GET fails, the notification
+	// fires indefinitely with no Terraform state entry tracking it.
 	if getCalled {
 		t.Error("CreateRepoNotification must not GET after POST; the POST response already contains the full notification")
 	}
@@ -55,10 +53,9 @@ func TestCreateRepoNotification(t *testing.T) {
 	}
 }
 
-// TestCreateRepoNotification_GetFailsAfterPost demonstrates the orphan window.
-// If CreateRepoNotification issues a GET after a successful POST and that GET
-// fails, Create returns an error with no state entry — the notification already
-// exists in Quay and will keep firing, but Terraform has no record of it.
+// TestCreateRepoNotification_GetFailsAfterPost demonstrates the orphan window:
+// if a GET after a successful POST fails, the notification exists in Quay and
+// keeps firing but Terraform has no state entry for it.
 func TestCreateRepoNotification_GetFailsAfterPost(t *testing.T) {
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		switch {
@@ -80,9 +77,6 @@ func TestCreateRepoNotification_GetFailsAfterPost(t *testing.T) {
 		Method: "webhook",
 		Config: map[string]any{"url": "https://example.com"},
 	})
-	// With the GET-after-POST present, this returns an error and notif is nil —
-	// the notification exists in Quay but Terraform has no state entry.
-	// With the fix (POST body only), this succeeds and the uuid is tracked.
 	if err != nil {
 		t.Errorf("CreateRepoNotification returned an error when the POST succeeded; "+
 			"the notification exists in Quay but has no state entry: %v", err)
@@ -133,8 +127,7 @@ func TestDeleteRepoNotification(t *testing.T) {
 	}
 }
 
-// TestGetRepoNotification_NotFound verifies that looking up a uuid that is not
-// in the notification list returns IsNotFound.
+// TestGetRepoNotification_NotFound verifies that a uuid absent from the list returns IsNotFound.
 func TestGetRepoNotification_NotFound(t *testing.T) {
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"notifications": []any{}})
@@ -145,8 +138,7 @@ func TestGetRepoNotification_NotFound(t *testing.T) {
 	}
 }
 
-// TestCreateRepoNotification_VulnerabilityLevelSentAsInt32 asserts that the
-// client passes the level integer through to the API request body unchanged.
+// TestCreateRepoNotification_VulnerabilityLevelSentAsInt32 asserts that the level integer reaches the API unchanged.
 func TestCreateRepoNotification_VulnerabilityLevelSentAsInt32(t *testing.T) {
 	var capturedBody map[string]any
 
@@ -193,9 +185,8 @@ func TestCreateRepoNotification_VulnerabilityLevelSentAsInt32(t *testing.T) {
 	}
 }
 
-// TestEventConfig_VulnerabilityLevelString asserts that EventConfig.VulnerabilityLevelString
-// returns the canonical Quay severity name for each integer index, and ("", false) when
-// the key is absent or the index is out of range.
+// TestEventConfig_VulnerabilityLevelString asserts the canonical severity name is returned
+// for each index, and ("", false) when the key is absent or the index is out of range.
 func TestEventConfig_VulnerabilityLevelString(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -227,9 +218,8 @@ func TestEventConfig_VulnerabilityLevelString(t *testing.T) {
 	}
 }
 
-// TestVulnerabilityLevelIndexFromString asserts that VulnerabilityLevelIndexFromString
-// returns the correct integer index for each canonical Quay severity name, and
-// (-1, false) for unrecognised strings.
+// TestVulnerabilityLevelIndexFromString asserts the correct integer index is returned
+// for each canonical severity name, and (0, false) for unrecognised strings.
 func TestVulnerabilityLevelIndexFromString(t *testing.T) {
 	tests := []struct {
 		input     string
@@ -260,8 +250,7 @@ func TestVulnerabilityLevelIndexFromString(t *testing.T) {
 	}
 }
 
-// TestEventConfig_VulnerabilityLevelInt32 asserts that EventConfig.VulnerabilityLevelInt32
-// returns the level as an int32 and false when the key is absent.
+// TestEventConfig_VulnerabilityLevelInt32 asserts the level is returned as int32 and false when absent.
 func TestEventConfig_VulnerabilityLevelInt32(t *testing.T) {
 	tests := []struct {
 		name      string

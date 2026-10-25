@@ -128,11 +128,9 @@ resource "quay_repository_notification" "test" {
 	})
 }
 
-// TestAccRepositoryNotification_vulnerabilityNoLevel verifies that a
-// vulnerability_found notification with no level (meaning any severity) can be
-// created and read back without error. The Quay UI and API both support
-// omitting the level, which means "notify on any severity", but the provider
-// previously required level to be set and errored on read when it was absent.
+// TestAccRepositoryNotification_vulnerabilityNoLevel verifies that omitting level
+// (meaning "any severity") can be created and read back. The provider previously
+// required level and errored on read when it was absent.
 func TestAccRepositoryNotification_vulnerabilityNoLevel(t *testing.T) {
 	skipIfNoAcc(t)
 	orgName := rname("tf-acc-vuln-nolvl-org")
@@ -174,11 +172,9 @@ resource "quay_repository_notification" "test" {
 	})
 }
 
-// TestAccRepositoryNotification_repoImageExpiry verifies that a
-// repo_image_expiry notification can be created and read back correctly.
-// Without modelling this event, importing a UI-created notification of this
-// type fails with "Unknown Notification Event ... please report this as a
-// provider bug".
+// TestAccRepositoryNotification_repoImageExpiry verifies that repo_image_expiry
+// notifications can be created and read back. Without this event type, importing
+// a UI-created notification fails with "Unknown Notification Event".
 func TestAccRepositoryNotification_repoImageExpiry(t *testing.T) {
 	skipIfNoAcc(t)
 	orgName := rname("tf-acc-expiry-org")

@@ -70,10 +70,9 @@ data "quay_organization" "test" {
 	})
 }
 
-// TestAccOrganization_CreateWithInvoiceEmailTrue verifies that invoice_email
-// is persisted correctly on create and can be toggled to false on update.
-// Quay's POST endpoint does not accept this field, so it is applied via a
-// follow-up PUT whose body must reflect the configured value, not the API default.
+// TestAccOrganization_CreateWithInvoiceEmailTrue verifies that invoice_email is persisted
+// on create and can be toggled to false. Quay's POST endpoint omits this field,
+// so a follow-up PUT must send the configured value, not the API default.
 func TestAccOrganization_CreateWithInvoiceEmailTrue(t *testing.T) {
 	skipIfNoAcc(t)
 	orgName := rname("tf-acc-inv-email-org")
@@ -95,8 +94,7 @@ resource "quay_organization" "test" {
 					resource.TestCheckResourceAttr("quay_organization.test", "invoice_email", "true"),
 				),
 			},
-			// false must round-trip correctly; the Quay API would silently
-			// ignore an omitted field and keep the old value.
+			// false must round-trip; an omitted field would be silently ignored.
 			{
 				Config: providerConfig() + fmt.Sprintf(`
 resource "quay_organization" "test" {
@@ -113,11 +111,9 @@ resource "quay_organization" "test" {
 	})
 }
 
-// TestAccOrganization_CreateWithTagExpirationS verifies that tag_expiration_s
-// is persisted correctly on create and can be changed on update. Quay's POST
-// endpoint does not accept this field, so it is applied via a follow-up PUT.
-// 86400 is used as the initial value because it is unambiguously different from
-// Quay's default of 1209600, making a regression immediately visible.
+// TestAccOrganization_CreateWithTagExpirationS verifies that tag_expiration_s is persisted
+// on create and changed on update. 86400 is chosen because it differs unambiguously
+// from Quay's default of 1209600, making a regression immediately visible.
 func TestAccOrganization_CreateWithTagExpirationS(t *testing.T) {
 	skipIfNoAcc(t)
 	orgName := rname("tf-acc-tag-exp-org")
@@ -156,8 +152,7 @@ resource "quay_organization" "test" {
 }
 
 // TestAccOrganization_CreateWithAllOptionalFields verifies that all fields
-// excluded from Quay's POST endpoint are persisted correctly when configured
-// simultaneously on create.
+// excluded from Quay's POST endpoint are persisted when configured simultaneously.
 func TestAccOrganization_CreateWithAllOptionalFields(t *testing.T) {
 	skipIfNoAcc(t)
 	orgName := rname("tf-acc-all-opts-org")
@@ -187,11 +182,9 @@ resource "quay_organization" "test" {
 	})
 }
 
-// TestAccOrganization_RemovingEmailClearsIt verifies that removing the email
-// attribute from config sends an explicit empty string to Quay and clears the
-// value. UseStateForUnknown on an Optional+Computed field causes Terraform to
-// copy the old state value into the plan when the attribute is absent, so no
-// update is ever sent and Quay keeps the old value.
+// TestAccOrganization_RemovingEmailClearsIt verifies that removing email from config
+// clears it in Quay. UseStateForUnknown on an Optional+Computed field copies the old
+// state value into the plan when the attribute is absent, suppressing the update.
 func TestAccOrganization_RemovingEmailClearsIt(t *testing.T) {
 	skipIfNoAcc(t)
 	orgName := rname("tf-acc-email-clear-org")
@@ -209,8 +202,6 @@ resource "quay_organization" "test" {
 `, orgName),
 				Check: resource.TestCheckResourceAttr("quay_organization.test", "email", "initial@example.com"),
 			},
-			// Remove email from config. With the bug, UseStateForUnknown
-			// copies "initial@example.com" into the plan and no update is sent.
 			{
 				Config: providerConfig() + fmt.Sprintf(`
 resource "quay_organization" "test" {
@@ -224,8 +215,7 @@ resource "quay_organization" "test" {
 }
 
 // TestAccOrganization_RemovingInvoiceEmailAddressClearsIt verifies that removing
-// invoice_email_address from config sends an explicit empty string to Quay and
-// clears the value.
+// invoice_email_address from config clears it in Quay.
 func TestAccOrganization_RemovingInvoiceEmailAddressClearsIt(t *testing.T) {
 	skipIfNoAcc(t)
 	orgName := rname("tf-acc-inv-addr-clear-org")
@@ -244,7 +234,6 @@ resource "quay_organization" "test" {
 `, orgName),
 				Check: resource.TestCheckResourceAttr("quay_organization.test", "invoice_email_address", "billing@example.com"),
 			},
-			// Remove invoice_email_address from config.
 			{
 				Config: providerConfig() + fmt.Sprintf(`
 resource "quay_organization" "test" {
@@ -280,9 +269,8 @@ resource "quay_repository" "child" {
 `, orgName),
 				Check: resource.TestCheckResourceAttr("quay_organization.test", "name", orgName),
 			},
-			// The repository is kept in config with a hardcoded namespace so
-			// Terraform has no reason to destroy it before the org, exercising
-			// the non-empty delete guard.
+			// Keeping the repository in config with a hardcoded namespace ensures
+			// Terraform has no reason to destroy it before the org.
 			{
 				Config: providerConfig() + fmt.Sprintf(`
 resource "quay_repository" "child" {
@@ -293,8 +281,7 @@ resource "quay_repository" "child" {
 `, orgName),
 				ExpectError: regexp.MustCompile(`(?i)(non-empty|contains repositories|cannot delete)`),
 			},
-			// Remove the child out-of-band so the org can be destroyed cleanly
-			// by CheckDestroy.
+			// Remove the child out-of-band so CheckDestroy can destroy the org cleanly.
 			{
 				Config: providerConfig() + fmt.Sprintf(`
 resource "quay_organization" "test" {

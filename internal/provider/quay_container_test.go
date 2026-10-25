@@ -19,8 +19,7 @@ import (
 )
 
 const (
-	// v3.14.0+ uses SQLite WAL mode, which handles concurrent access from
-	// parallel test runs without "database is locked" 500 errors.
+	// v3.14.0+ uses SQLite WAL mode, avoiding "database is locked" errors under parallel access.
 	defaultQuayImage = "quay.io/projectquay/quay:v3.17.3"
 	quayPort         = "8080/tcp"
 	quayAdminUser    = "quayadmin"
@@ -29,8 +28,7 @@ const (
 	quayStartTimeout = 5 * time.Minute
 )
 
-// quayContainer holds a running Quay instance and the credentials needed to
-// interact with it.
+// quayContainer holds a running Quay instance and its credentials.
 type quayContainer struct {
 	quay        tc.Container
 	accessToken string
@@ -38,7 +36,7 @@ type quayContainer struct {
 	tmpDir      string // host temp dir bind-mounted into the container; removed on cleanup
 }
 
-// Cleanup terminates the Quay container and the host temp directory.
+// Cleanup terminates the container and removes the host temp directory.
 func (q *quayContainer) Cleanup(ctx context.Context) {
 	if q.quay != nil {
 		_ = q.quay.Terminate(ctx)
@@ -48,8 +46,7 @@ func (q *quayContainer) Cleanup(ctx context.Context) {
 	}
 }
 
-// runQuay starts a Quay container, waits for the health endpoint, then
-// bootstraps an admin user and returns an access token.
+// runQuay starts a Quay container, waits for it to be healthy, and bootstraps an admin user.
 func runQuay(ctx context.Context, image string) (*quayContainer, error) {
 	if image == "" {
 		image = defaultQuayImage
@@ -60,16 +57,13 @@ func runQuay(ctx context.Context, image string) (*quayContainer, error) {
 		return nil, fmt.Errorf("building quay config: %w", err)
 	}
 
-	// Write config and create storage dir on the host, then bind-mount them
-	// into the container. This is the most Podman-compatible approach —
-	// CopyToContainer doesn't work on stopped containers under Podman, and
-	// ContainerFile trips Podman's path-escapes-parent security check.
+	// Bind-mount config and storage from the host: CopyToContainer doesn't work
+	// on stopped Podman containers and ContainerFile trips Podman's path-escapes-parent check.
 	tmpDir, err := os.MkdirTemp("", "quay-test-*")
 	if err != nil {
 		return nil, fmt.Errorf("creating temp dir: %w", err)
 	}
-	// tmpDir will be cleaned up when the test process exits; Podman may need
-	// it to persist for the container's lifetime so we don't defer removal.
+	// tmpDir must outlive the container, so removal is deferred to Cleanup.
 
 	configDir := filepath.Join(tmpDir, "config")
 	storageDir := filepath.Join(tmpDir, "storage")
@@ -77,9 +71,8 @@ func runQuay(ctx context.Context, image string) (*quayContainer, error) {
 		if err := os.MkdirAll(d, 0o777); err != nil {
 			return nil, fmt.Errorf("creating dir %s: %w", d, err)
 		}
-		// Podman rootless maps host UIDs into a user namespace, so the UID
-		// inside the container (Quay runs as 1001) won't match the host UID.
-		// Make directories world-writable so any mapped UID can read/write.
+		// Podman rootless maps host UIDs, so the container UID won't match the host.
+		// World-writable permissions let any mapped UID read/write.
 		if err := os.Chmod(d, 0o777); err != nil {
 			return nil, fmt.Errorf("chmod dir %s: %w", d, err)
 		}
@@ -87,7 +80,6 @@ func runQuay(ctx context.Context, image string) (*quayContainer, error) {
 	if err := os.WriteFile(filepath.Join(configDir, "config.yaml"), []byte(cfg), 0o644); err != nil {
 		return nil, fmt.Errorf("writing config: %w", err)
 	}
-	// World-readable so the container UID can open it.
 	if err := os.Chmod(filepath.Join(configDir, "config.yaml"), 0o644); err != nil {
 		return nil, fmt.Errorf("chmod config: %w", err)
 	}
@@ -99,10 +91,8 @@ func runQuay(ctx context.Context, image string) (*quayContainer, error) {
 				Env: map[string]string{
 					"IGNORE_VALIDATION": "true",
 				},
-				// Use HostConfigModifier to set bind mounts with the :z SELinux
-				// label. On Podman/Fedora (SELinux enforcing), the :z flag
-				// relabels the host directory so the container process can access
-				// it regardless of UID mapping in rootless mode.
+				// :z relabels the host directory for SELinux, required on Podman/Fedora
+				// so the container process can access it regardless of UID mapping.
 				HostConfigModifier: func(hc *dockercontainer.HostConfig) {
 					hc.Binds = append(hc.Binds,
 						configDir+":"+"/conf/stack"+":z",
@@ -151,9 +141,8 @@ func runQuay(ctx context.Context, image string) (*quayContainer, error) {
 	}, nil
 }
 
-// bootstrapQuayAdmin calls FEATURE_USER_INITIALIZE to create the first admin
-// user and returns its OAuth token. This endpoint only works once (while the
-// user database is empty).
+// bootstrapQuayAdmin calls FEATURE_USER_INITIALIZE to create the first admin user.
+// This endpoint only works once, while the user database is empty.
 func bootstrapQuayAdmin(ctx context.Context, baseURL string) (string, error) {
 	body, err := json.Marshal(map[string]any{
 		"username":     quayAdminUser,
@@ -197,7 +186,7 @@ func bootstrapQuayAdmin(ctx context.Context, baseURL string) (string, error) {
 	return result.AccessToken, nil
 }
 
-// quayConfigTmpl is the minimal config.yaml for a test Quay instance.
+// quayConfigTmpl is the minimal config.yaml needed to run a test Quay instance.
 var quayConfigTmpl = template.Must(template.New("cfg").Parse(`
 AUTHENTICATION_TYPE: Database
 SERVER_HOSTNAME: localhost:8080

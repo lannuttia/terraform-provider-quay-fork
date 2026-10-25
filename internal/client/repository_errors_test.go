@@ -104,8 +104,7 @@ func TestChangeRepositoryVisibility_NotFound(t *testing.T) {
 }
 
 func TestChangeRepositoryVisibility_InvalidValue(t *testing.T) {
-	// The client now rejects unrecognised visibility values before making any
-	// HTTP request, so no test server is needed.
+	// Invalid values are rejected before any HTTP request is made.
 	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
 		t.Error("HTTP request should not have been made for an invalid visibility value")
 	})

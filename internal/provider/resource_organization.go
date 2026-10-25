@@ -125,9 +125,8 @@ func (r *OrganizationResource) Create(ctx context.Context, req resource.CreateRe
 		return
 	}
 
-	// The POST response does not include fields like invoice_email or
-	// tag_expiration_s, so Quay's defaults would be sent back to the API
-	// rather than the user's configured values if we read from state here.
+	// Quay's POST response omits invoice_email and tag_expiration_s, so the
+	// follow-up PUT must use the plan values, not the API defaults.
 	needsUpdate := (!plan.InvoiceEmail.IsNull() && !plan.InvoiceEmail.IsUnknown()) ||
 		(!plan.InvoiceEmailAddress.IsNull() && !plan.InvoiceEmailAddress.IsUnknown()) ||
 		(!plan.TagExpirationS.IsNull() && !plan.TagExpirationS.IsUnknown())
@@ -141,7 +140,7 @@ func (r *OrganizationResource) Create(ctx context.Context, req resource.CreateRe
 		}
 	}
 
-	// Save state now so a failure in the follow-up PUT doesn't orphan the org.
+	// A failure in the follow-up PUT would otherwise orphan the org with no state entry.
 	r.mapToState(org, &plan)
 	resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
 	if resp.Diagnostics.HasError() {
@@ -210,10 +209,8 @@ func (r *OrganizationResource) Delete(ctx context.Context, req resource.DeleteRe
 	}
 
 	// Quay deletes all org content immediately with no grace period, including
-	// resources not managed by Terraform. Require the org to have no image
-	// repositories first. Note: the guard checks image repositories only —
-	// an org with robots, teams or OAuth applications but no repos will still
-	// be deleted along with those resources.
+	// resources Terraform never managed. The guard covers image repositories only;
+	// robots, teams and OAuth applications are not protected.
 	hasRepos, err := r.client.HasOrganizationRepositories(ctx, state.Name.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Error Checking Organization Repositories", err.Error())

@@ -20,9 +20,8 @@ const defaultBaseURL = "https://quay.io"
 const DefaultTimeout = 30 * time.Second
 
 // ValidateURL returns an error if the URL is not acceptable. An empty string
-// is allowed (it defaults to https://quay.io). http:// URLs are rejected
-// unless the host is a loopback address, since the bearer token would
-// otherwise be sent in plaintext over the network.
+// defaults to https://quay.io. http:// is rejected for non-loopback hosts
+// because the bearer token would be sent in plaintext.
 func ValidateURL(rawURL string) error {
 	if rawURL == "" {
 		return nil
@@ -37,9 +36,8 @@ func ValidateURL(rawURL string) error {
 	return nil
 }
 
-// isLoopback reports whether host is a loopback address (127.x.x.x or ::1 or
-// "localhost"). http:// is permitted for loopback hosts to support local
-// development and acceptance testing against a containerised Quay instance.
+// isLoopback reports whether host is a loopback address. http:// is permitted
+// for loopback hosts to support local development and acceptance testing.
 func isLoopback(host string) bool {
 	if host == "localhost" {
 		return true
@@ -56,8 +54,7 @@ type Client struct {
 	retryDelay func(attempt int) time.Duration
 }
 
-// New creates a new Quay API client. timeout is applied to every HTTP request;
-// pass 0 to disable the timeout entirely.
+// New creates a new Quay API client. Pass 0 to disable the timeout.
 func New(baseURL, token string, timeout time.Duration) *Client {
 	if baseURL == "" {
 		baseURL = defaultBaseURL
@@ -68,10 +65,9 @@ func New(baseURL, token string, timeout time.Duration) *Client {
 		token:   token,
 		httpClient: &http.Client{
 			Timeout: timeout,
-			// Refuse redirects on non-GET requests to prevent Go from
-			// silently rewriting the method to GET (per RFC 7231).
-			// via[0].Method holds the original method; req.Method is
-			// already rewritten by the time CheckRedirect fires.
+			// Go silently rewrites the method to GET on redirect (per RFC 7231);
+			// non-GET redirects must be refused so a redirected DELETE is not
+			// reported as success.
 			CheckRedirect: func(req *http.Request, via []*http.Request) error {
 				if len(via) > 0 && via[0].Method != http.MethodGet {
 					return http.ErrUseLastResponse
@@ -79,10 +75,8 @@ func New(baseURL, token string, timeout time.Duration) *Client {
 				if len(via) >= 10 {
 					return fmt.Errorf("too many redirects")
 				}
-				// Strip the Authorization header when redirecting to http://
-				// to prevent the bearer token leaking over plaintext on
-				// same-host https->http downgrade redirects, which Go does
-				// not strip automatically.
+				// Go does not strip Authorization on same-host https->http
+				// redirects, so the bearer token would leak in plaintext.
 				if req.URL.Scheme == "http" {
 					req.Header.Del("Authorization")
 				}
@@ -95,8 +89,7 @@ func New(baseURL, token string, timeout time.Duration) *Client {
 	}
 }
 
-// withRetryDelay returns a shallow copy of the client with a custom retry
-// delay function. Used in tests to eliminate retry wait time.
+// withRetryDelay returns a shallow copy of the client with a custom retry delay function.
 func (c *Client) withRetryDelay(f func(attempt int) time.Duration) *Client {
 	copy := *c
 	copy.retryDelay = f
@@ -136,7 +129,7 @@ func IsForbidden(err error) bool {
 }
 
 func (c *Client) newRequest(ctx context.Context, method, path string, body any) (*http.Request, error) {
-	// url.JoinPath percent-encodes '?', so split the query string first.
+	// url.JoinPath percent-encodes '?', so the query string must be split off first.
 	rawPath := path
 	rawQuery := ""
 	if idx := strings.IndexByte(path, '?'); idx >= 0 {
@@ -175,8 +168,8 @@ func (c *Client) newRequest(ctx context.Context, method, path string, body any) 
 	return req, nil
 }
 
-// retryable5xxCodes are transient errors safe to retry on idempotent methods.
-// POST is excluded because a committed POST may have already mutated state.
+// retryable5xxCodes are the transient server errors safe to retry on idempotent methods.
+// POST is excluded because a committed POST may have already mutated state on the server.
 var retryable5xxCodes = map[int]bool{
 	http.StatusInternalServerError: true,
 	http.StatusBadGateway:          true,

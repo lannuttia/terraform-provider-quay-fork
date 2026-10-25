@@ -127,14 +127,10 @@ func (r *RepositoryResource) Read(ctx context.Context, req resource.ReadRequest,
 			resp.State.RemoveResource(ctx)
 			return
 		}
-		// Quay returns 403 (not 404) when a repo's namespace has been deleted
-		// out-of-band. Only remove from state if the namespace is truly gone;
-		// otherwise the 403 is a genuine permission error and must surface.
-		// NamespaceExists checks both the org and user endpoints so that
-		// repositories owned by user accounts are handled correctly —
-		// GetOrganization alone always returns 404 for user namespaces,
-		// which would incorrectly make every user-namespace 403 look like a
-		// deleted namespace.
+		// Quay returns 403 when a repo's org namespace is deleted out-of-band.
+		// For user namespaces, GetOrganization always returns 404, so the check
+		// must also consult the user endpoint to avoid treating a permission
+		// error as a deleted namespace.
 		if client.IsForbidden(err) {
 			exists, nsErr := r.client.NamespaceExists(ctx, state.Namespace.ValueString())
 			if nsErr == nil && !exists {
@@ -173,8 +169,7 @@ func (r *RepositoryResource) Update(ctx context.Context, req resource.UpdateRequ
 		if err := r.client.ChangeRepositoryVisibility(ctx, repoPath, client.ChangeVisibilityRequest{
 			Visibility: plan.Visibility.ValueString(),
 		}); err != nil {
-			// Description already updated; save state with the old visibility
-			// so it reflects what Quay actually has.
+			// The description was already updated; state must reflect what Quay actually has.
 			repo.IsPublic = state.Visibility.ValueString() == client.VisibilityPublic
 			r.mapToState(repo, &plan)
 			resp.Diagnostics.Append(resp.State.Set(ctx, &plan)...)
@@ -196,7 +191,6 @@ func (r *RepositoryResource) Delete(ctx context.Context, req resource.DeleteRequ
 	}
 
 	// Quay purges tag content immediately with no grace period.
-	// Require the repository to have no active tags before deleting.
 	hasTags, err := r.client.HasRepositoryTags(ctx, state.ID.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("Error Checking Repository Tags", err.Error())

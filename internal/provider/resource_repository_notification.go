@@ -66,9 +66,8 @@ type EmailConfig struct {
 	Email types.String `tfsdk:"email"`
 }
 
-// QuayNotificationTarget identifies the Quay user or team to receive an
-// in-app alert in the Quay web UI. Quay's API requires this inside
-// config.target; without it the API returns 400 "Missing target".
+// QuayNotificationTarget identifies the Quay user or team to notify in-app.
+// Quay returns 400 "Missing target" when config.target is absent.
 type QuayNotificationTarget struct {
 	Kind types.String `tfsdk:"kind"`
 	Name types.String `tfsdk:"name"`
@@ -104,7 +103,7 @@ func (r *RepositoryNotificationResource) Metadata(_ context.Context, req resourc
 	resp.TypeName = req.ProviderTypeName + "_repository_notification"
 }
 
-// buildEventAttributes returns the shared attribute set for all build event blocks.
+// buildEventAttributes returns the attribute set shared by all build event blocks.
 func buildEventAttributes(requiresReplace []planmodifier.String) map[string]schema.Attribute {
 	return map[string]schema.Attribute{
 		"ref_regex": schema.StringAttribute{
@@ -320,8 +319,7 @@ func (r *RepositoryNotificationResource) Schema(_ context.Context, _ resource.Sc
 	}
 }
 
-// ConfigValidators enforces that exactly one method block and exactly one
-// event block are set.
+// ConfigValidators enforces that exactly one method block and one event block are present.
 func (r *RepositoryNotificationResource) ConfigValidators(_ context.Context) []resource.ConfigValidator {
 	return []resource.ConfigValidator{
 		resourcevalidator.ExactlyOneOf(
@@ -414,9 +412,7 @@ func (r *RepositoryNotificationResource) Read(ctx context.Context, req resource.
 }
 
 func (r *RepositoryNotificationResource) Update(_ context.Context, _ resource.UpdateRequest, resp *resource.UpdateResponse) {
-	// All attributes on this resource carry RequiresReplace, so the Terraform
-	// framework should never invoke Update. If it does, that is a bug in the
-	// provider schema.
+	// All attributes carry RequiresReplace, so the framework should never call Update.
 	resp.Diagnostics.AddError(
 		"Unexpected Update",
 		"The quay_repository_notification resource does not support in-place updates. "+
@@ -440,7 +436,6 @@ func (r *RepositoryNotificationResource) Delete(ctx context.Context, req resourc
 }
 
 func (r *RepositoryNotificationResource) ImportState(ctx context.Context, req resource.ImportStateRequest, resp *resource.ImportStateResponse) {
-	// Import ID: namespace/repo_name/uuid  (3 parts, last part is the UUID)
 	parts, diags := splitImportID(resp, req.ID, 3, "my-org/my-repo/32bb0ef6-ad69-4ccb-b64e-ddbc8bfd444d")
 	if diags.HasError() {
 		return
@@ -449,9 +444,8 @@ func (r *RepositoryNotificationResource) ImportState(ctx context.Context, req re
 	repoName := parts[1]
 	uuid := parts[2]
 	setAttrs(ctx, resp, map[string]string{
-		// id is derived from the parsed parts, not passed through verbatim from
-		// req.ID. This guarantees id is always canonical (namespace/name/uuid)
-		// and matches the value mapToState computes during Create and Read.
+		// id is derived from the parsed parts so it is always canonical and
+		// matches what mapToState produces during Create and Read.
 		"id":        namespace + "/" + repoName + "/" + uuid,
 		"namespace": namespace,
 		"name":      repoName,
@@ -459,8 +453,7 @@ func (r *RepositoryNotificationResource) ImportState(ctx context.Context, req re
 	})
 }
 
-// methodAndConfig derives the API method string and config map from whichever
-// method block is set in the plan.
+// methodAndConfig returns the API method string and config map for the active method block.
 func (m *RepositoryNotificationResourceModel) methodAndConfig() (string, map[string]any) {
 	switch {
 	case m.Webhook != nil:
@@ -477,13 +470,12 @@ func (m *RepositoryNotificationResourceModel) methodAndConfig() (string, map[str
 			},
 		}
 	default:
-		// ConfigValidators guarantees this is unreachable.
+		// Unreachable: ConfigValidators ensures exactly one method block is set.
 		return "", map[string]any{}
 	}
 }
 
-// eventAndConfig derives the API event string and event_config map from
-// whichever event block is set in the plan.
+// eventAndConfig returns the API event string and event_config map for the active event block.
 func (m *RepositoryNotificationResourceModel) eventAndConfig() (string, map[string]any) {
 	switch {
 	case m.RepoPush != nil:
@@ -513,13 +505,12 @@ func (m *RepositoryNotificationResourceModel) eventAndConfig() (string, map[stri
 	case m.RepoMirrorSyncFailed != nil:
 		return "repo_mirror_sync_failed", map[string]any{}
 	default:
-		// ConfigValidators guarantees this is unreachable.
+		// Unreachable: ConfigValidators ensures exactly one event block is set.
 		return "", map[string]any{}
 	}
 }
 
-// buildRefRegexConfig returns an event_config map for build events,
-// omitting the ref-regex key when the value is null or unknown.
+// buildRefRegexConfig returns an event_config map for build events, omitting ref-regex when unset.
 func buildRefRegexConfig(refRegex types.String) map[string]any {
 	cfg := map[string]any{}
 	if !refRegex.IsNull() && !refRegex.IsUnknown() {
@@ -605,8 +596,7 @@ func (r *RepositoryNotificationResource) mapToState(notif *client.Notification, 
 		if levelStr, ok := notif.EventConfig.VulnerabilityLevelString(); ok {
 			level = types.StringValue(levelStr)
 		} else {
-			// No level in the event config means "any severity" — this is
-			// valid and is what the Quay UI sends when no level is selected.
+			// Quay omits the level when "any severity" is selected.
 			level = types.StringNull()
 		}
 		state.VulnerabilityFound = &VulnerabilityFoundEvent{Level: level}
@@ -634,8 +624,7 @@ func (r *RepositoryNotificationResource) mapToState(notif *client.Notification, 
 	return diags
 }
 
-// refRegexFromEventConfig extracts the ref-regex value from a build event
-// config, returning a null string when the key is absent.
+// refRegexFromEventConfig extracts ref-regex from a build event config, or returns null when absent.
 func refRegexFromEventConfig(eventConfig client.EventConfig) types.String {
 	if v, ok := eventConfig["ref-regex"]; ok {
 		return types.StringValue(fmt.Sprintf("%v", v))
@@ -643,7 +632,7 @@ func refRegexFromEventConfig(eventConfig client.EventConfig) types.String {
 	return types.StringNull()
 }
 
-// stringFromConfig safely extracts a string value from a map[string]any.
+// stringFromConfig extracts a string value from a map[string]any, returning "" when absent.
 func stringFromConfig(m map[string]any, key string) string {
 	if v, ok := m[key]; ok {
 		return fmt.Sprintf("%v", v)
