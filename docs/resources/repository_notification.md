@@ -75,7 +75,7 @@ resource "quay_repository_notification" "main_build_email" {
 - `build_queued` (Attributes) Trigger when a build is queued. (see [below for nested schema](#nestedatt--build_queued))
 - `build_start` (Attributes) Trigger when a build starts. (see [below for nested schema](#nestedatt--build_start))
 - `build_success` (Attributes) Trigger when a build succeeds. (see [below for nested schema](#nestedatt--build_success))
-- `email` (Attributes) Deliver notifications by email. (see [below for nested schema](#nestedatt--email))
+- `email` (Attributes) Deliver notifications by email. The address must already be authorized and confirmed for the repository in the Quay UI before this resource is created; Quay rejects unverified addresses with 400 "not authorized to receive notifications" and the provider cannot run the confirmation flow. (see [below for nested schema](#nestedatt--email))
 - `flowdock` (Attributes) Deliver notifications to a Flowdock flow. (see [below for nested schema](#nestedatt--flowdock))
 - `hipchat` (Attributes) Deliver notifications to a HipChat room. (see [below for nested schema](#nestedatt--hipchat))
 - `quay_notification` (Attributes) Deliver notifications as in-app alerts in the Quay web UI to a specific user or team. The recipient must be a member of the repository's namespace. (see [below for nested schema](#nestedatt--quay_notification))

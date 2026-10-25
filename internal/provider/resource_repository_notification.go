@@ -187,8 +187,11 @@ func (r *RepositoryNotificationResource) Schema(_ context.Context, _ resource.Sc
 				},
 			},
 			"email": schema.SingleNestedAttribute{
-				Optional:      true,
-				Description:   "Deliver notifications by email.",
+				Optional: true,
+				Description: "Deliver notifications by email. " +
+					"The address must already be authorized and confirmed for the repository in the Quay UI " +
+					"before this resource is created; Quay rejects unverified addresses with 400 " +
+					"\"not authorized to receive notifications\" and the provider cannot run the confirmation flow.",
 				PlanModifiers: requiresReplaceObj,
 				Attributes: map[string]schema.Attribute{
 					"email": schema.StringAttribute{
