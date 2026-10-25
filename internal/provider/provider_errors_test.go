@@ -73,6 +73,72 @@ provider "quay" {
 	})
 }
 
+// TestProvider_UnknownToken verifies that an unknown token value (e.g. from a
+// resource not yet created) is rejected at configure time rather than silently
+// falling back to QUAY_TOKEN or an empty string. A silent fallback could send
+// the token to the wrong host or use no token at all, removing resources from
+// state when the API returns 404 or 401.
+func TestProvider_UnknownToken(t *testing.T) {
+	t.Setenv("QUAY_TOKEN", "env-token-should-not-be-used")
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: providerFactories(),
+		Steps: []resource.TestStep{
+			{
+				// terraform_data.test.output is unknown at plan time, so
+				// token is unknown when the provider is configured.
+				Config: `
+resource "terraform_data" "test" {
+  input = "not-yet-known"
+}
+
+provider "quay" {
+  url   = "https://quay.io"
+  token = terraform_data.test.output
+}
+
+data "quay_repository" "test" {
+  namespace = "myorg"
+  name      = "myrepo"
+}
+`,
+				ExpectError: regexp.MustCompile(`(?i)(unknown|Invalid Quay API Token)`),
+			},
+		},
+	})
+}
+
+// TestProvider_UnknownURL verifies that an unknown url value is rejected at
+// configure time rather than silently falling back to QUAY_URL or https://quay.io.
+func TestProvider_UnknownURL(t *testing.T) {
+	t.Setenv("QUAY_TOKEN", "test-token")
+	t.Setenv("QUAY_URL", "https://should-not-be-used.example.com")
+
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: providerFactories(),
+		Steps: []resource.TestStep{
+			{
+				Config: `
+resource "terraform_data" "test" {
+  input = "https://not-yet-known.example.com"
+}
+
+provider "quay" {
+  url   = terraform_data.test.output
+  token = "test-token"
+}
+
+data "quay_repository" "test" {
+  namespace = "myorg"
+  name      = "myrepo"
+}
+`,
+				ExpectError: regexp.MustCompile(`(?i)(unknown|Invalid Quay URL)`),
+			},
+		},
+	})
+}
+
 // TestProvider_MissingToken verifies the provider returns a clear error when
 // no token is supplied (neither in config nor environment).
 func TestProvider_MissingToken(t *testing.T) {

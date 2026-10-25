@@ -67,15 +67,30 @@ func (p *QuayProvider) Configure(ctx context.Context, req provider.ConfigureRequ
 		return
 	}
 
+	if config.URL.IsUnknown() {
+		resp.Diagnostics.AddError(
+			"Invalid Quay URL",
+			"The `url` provider attribute is unknown. Ensure it resolves to a known value before configuring the provider.",
+		)
+		return
+	}
+	if config.Token.IsUnknown() {
+		resp.Diagnostics.AddError(
+			"Invalid Quay API Token",
+			"The `token` provider attribute is unknown. Ensure it resolves to a known value before configuring the provider.",
+		)
+		return
+	}
+
 	url := os.Getenv("QUAY_URL")
-	if !config.URL.IsNull() && !config.URL.IsUnknown() {
+	if !config.URL.IsNull() {
 		if v := config.URL.ValueString(); v != "" {
 			url = v
 		}
 	}
 
 	token := os.Getenv("QUAY_TOKEN")
-	if !config.Token.IsNull() && !config.Token.IsUnknown() {
+	if !config.Token.IsNull() {
 		if v := config.Token.ValueString(); v != "" {
 			token = v
 		}
