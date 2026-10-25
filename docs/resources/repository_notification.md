@@ -85,7 +85,7 @@ resource "quay_repository_notification" "main_build_email" {
 - `repo_push` (Attributes) Trigger on every image push to the repository. (see [below for nested schema](#nestedatt--repo_push))
 - `slack` (Attributes) Deliver notifications to a Slack channel via an Incoming Webhook URL. (see [below for nested schema](#nestedatt--slack))
 - `title` (String) A human-readable title for the notification.
-- `vulnerability_found` (Attributes) Trigger when a vulnerability is found. The required level attribute sets the minimum severity that triggers the notification. (see [below for nested schema](#nestedatt--vulnerability_found))
+- `vulnerability_found` (Attributes) Trigger when a vulnerability is found. (see [below for nested schema](#nestedatt--vulnerability_found))
 - `webhook` (Attributes) Deliver notifications via an HTTP POST to a URL. (see [below for nested schema](#nestedatt--webhook))
 
 ### Read-Only
@@ -203,9 +203,9 @@ Required:
 <a id="nestedatt--vulnerability_found"></a>
 ### Nested Schema for `vulnerability_found`
 
-Required:
+Optional:
 
-- `level` (String) The minimum vulnerability severity level that triggers the notification. One of: Critical, High, Medium, Low, Negligible, Unknown. Notifications fire for vulnerabilities at or above this severity. These names match the severity labels shown in the Quay UI.
+- `level` (String) The minimum vulnerability severity level that triggers the notification. One of: Critical, High, Medium, Low, Negligible, Unknown. When omitted, the notification fires for any severity. These names match the severity labels shown in the Quay UI.
 
 
 <a id="nestedatt--webhook"></a>
