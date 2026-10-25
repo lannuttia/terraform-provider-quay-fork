@@ -12,11 +12,18 @@ instance via the Quay REST API.
 
 ## Authentication
 
-The provider authenticates using an OAuth bearer token. To generate one:
+The provider authenticates using an OAuth application token. Encrypted
+passwords generated from the CLI password page are not accepted by the API.
 
-1. Log in to your Quay instance.
-2. Go to **Account Settings → User Settings → CLI Password**.
-3. Click **Generate Encrypted Password** and copy the token.
+To create a token:
+
+1. Log in to your Quay instance as an organisation admin.
+2. Navigate to the organisation, open the **Applications** tab, and create a
+   new application.
+3. Click **Generate Token** and select the scopes your configuration requires:
+   - `org:admin` — create and manage organisations
+   - `repo:admin` — create and manage repositories and their notifications
+4. Copy the token that is displayed. It is shown only once.
 
 Set the token via the `QUAY_TOKEN` environment variable to avoid storing
 credentials in your configuration files.
