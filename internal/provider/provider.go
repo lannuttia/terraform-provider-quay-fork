@@ -88,6 +88,10 @@ func (p *QuayProvider) Configure(ctx context.Context, req provider.ConfigureRequ
 			url = v
 		}
 	}
+	if err := client.ValidateURL(url); err != nil {
+		resp.Diagnostics.AddError("Invalid Quay URL", err.Error())
+		return
+	}
 
 	token := os.Getenv("QUAY_TOKEN")
 	if !config.Token.IsNull() {

@@ -184,6 +184,59 @@ func TestRedirect_GETAllowed(t *testing.T) {
 	}
 }
 
+// TestRedirect_GETStripsAuthOnDowngrade verifies that the Authorization header
+// is not forwarded when a GET redirect downgrades from https to http. Go
+// strips the header by default on cross-host redirects, but same-host
+// https->http redirects still carry the token, leaking the bearer credential
+// over plaintext.
+func TestRedirect_GETStripsAuthOnDowngrade(t *testing.T) {
+	var receivedAuth string
+
+	// Target: plain HTTP — records whether it received an Authorization header.
+	target := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		receivedAuth = r.Header.Get("Authorization")
+		writeJSON(w, http.StatusOK, client.Repository{Namespace: "org", Name: "repo"})
+	}))
+	t.Cleanup(target.Close)
+
+	// Origin: TLS server that redirects to the plain-HTTP target.
+	origin := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, target.URL+r.URL.Path, http.StatusMovedPermanently)
+	}))
+	t.Cleanup(origin.Close)
+
+	c := client.NewTestTLSClient(origin.URL, "test-token", origin.Client())
+	_, _ = c.GetRepository(context.Background(), "org/repo")
+
+	if receivedAuth != "" {
+		t.Errorf("Authorization header was forwarded on https->http redirect: %q — token leaked over plaintext", receivedAuth)
+	}
+}
+
+// TestHTTPURLRejected verifies that configuring the provider with an http://
+// URL is rejected, since the bearer token would be sent in plaintext.
+func TestHTTPURLRejected(t *testing.T) {
+	err := client.ValidateURL("http://quay.example.com")
+	if err == nil {
+		t.Error("expected error for http:// URL, got nil — token would be sent in plaintext")
+	}
+}
+
+// TestHTTPSURLAccepted verifies that https:// URLs are accepted.
+func TestHTTPSURLAccepted(t *testing.T) {
+	if err := client.ValidateURL("https://quay.example.com"); err != nil {
+		t.Errorf("unexpected error for https:// URL: %v", err)
+	}
+}
+
+// TestEmptyURLAccepted verifies that an empty URL is accepted (defaults to
+// https://quay.io).
+func TestEmptyURLAccepted(t *testing.T) {
+	if err := client.ValidateURL(""); err != nil {
+		t.Errorf("unexpected error for empty URL: %v", err)
+	}
+}
+
 // ----- Authorization header -----------------------------------------------
 
 func TestAuthorizationHeader(t *testing.T) {

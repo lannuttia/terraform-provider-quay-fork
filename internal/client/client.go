@@ -18,6 +18,23 @@ const defaultBaseURL = "https://quay.io"
 // DefaultTimeout is the HTTP client timeout used when none is specified.
 const DefaultTimeout = 30 * time.Second
 
+// ValidateURL returns an error if the URL is not acceptable. An empty string
+// is allowed (it defaults to https://quay.io). http:// URLs are rejected
+// because the bearer token would be sent in plaintext.
+func ValidateURL(rawURL string) error {
+	if rawURL == "" {
+		return nil
+	}
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("invalid URL %q: %w", rawURL, err)
+	}
+	if u.Scheme == "http" {
+		return fmt.Errorf("http:// URLs are not permitted — the bearer token would be sent in plaintext; use https://")
+	}
+	return nil
+}
+
 // Client is a Quay API client.
 type Client struct {
 	baseURL    string
@@ -48,6 +65,13 @@ func New(baseURL, token string, timeout time.Duration) *Client {
 				}
 				if len(via) >= 10 {
 					return fmt.Errorf("too many redirects")
+				}
+				// Strip the Authorization header when redirecting to http://
+				// to prevent the bearer token leaking over plaintext on
+				// same-host https->http downgrade redirects, which Go does
+				// not strip automatically.
+				if req.URL.Scheme == "http" {
+					req.Header.Del("Authorization")
 				}
 				return nil
 			},

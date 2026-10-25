@@ -139,6 +139,30 @@ data "quay_repository" "test" {
 	})
 }
 
+// TestProvider_HTTPURLRejected verifies that an http:// URL is rejected at
+// configure time, since the bearer token would be sent in plaintext.
+func TestProvider_HTTPURLRejected(t *testing.T) {
+	resource.UnitTest(t, resource.TestCase{
+		ProtoV6ProviderFactories: providerFactories(),
+		Steps: []resource.TestStep{
+			{
+				Config: `
+provider "quay" {
+  url   = "http://quay.example.com"
+  token = "test-token"
+}
+
+data "quay_repository" "test" {
+  namespace = "myorg"
+  name      = "myrepo"
+}
+`,
+				ExpectError: regexp.MustCompile(`(?i)(http.*plaintext|Invalid Quay URL)`),
+			},
+		},
+	})
+}
+
 // TestProvider_MissingToken verifies the provider returns a clear error when
 // no token is supplied (neither in config nor environment).
 func TestProvider_MissingToken(t *testing.T) {
