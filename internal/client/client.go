@@ -253,12 +253,21 @@ func (c *Client) doOnce(req *http.Request, out any) error {
 	if resp.StatusCode >= 400 {
 		apiErr := &APIError{StatusCode: resp.StatusCode}
 		var errBody struct {
-			Message   string `json:"message"`
-			ErrorType string `json:"error_type"`
+			Detail       string `json:"detail"`
+			ErrorMessage string `json:"error_message"`
+			Message      string `json:"message"`
+			ErrorType    string `json:"error_type"`
 		}
 		if json.Unmarshal(respBody, &errBody) == nil {
-			apiErr.Message = errBody.Message
 			apiErr.ErrorType = errBody.ErrorType
+			switch {
+			case errBody.Detail != "":
+				apiErr.Message = errBody.Detail
+			case errBody.ErrorMessage != "":
+				apiErr.Message = errBody.ErrorMessage
+			default:
+				apiErr.Message = errBody.Message
+			}
 		}
 		if apiErr.Message == "" {
 			apiErr.Message = string(respBody)

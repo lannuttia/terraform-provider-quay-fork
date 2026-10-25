@@ -93,6 +93,54 @@ func TestAPIError_500_InternalServerError(t *testing.T) {
 	}
 }
 
+// TestAPIError_UsesDetailField verifies that the detail field from Quay's
+// structured error response is used as the error message in preference to the
+// raw JSON body. Quay's API errors carry detail and error_message as the
+// primary human-readable fields; reading only message leaves users with raw
+// JSON in error output.
+func TestAPIError_UsesDetailField(t *testing.T) {
+	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{
+			"detail":        "Requires authentication",
+			"error_message": "Requires authentication",
+			"error_type":    "invalid_token",
+			"title":         "invalid_token",
+			"status":        "401",
+		})
+	})
+	_, err := c.GetRepository(context.Background(), "org/repo")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if strings.Contains(err.Error(), `"detail"`) {
+		t.Errorf("error message contains raw JSON key %q — detail field was not extracted: %v", "detail", err)
+	}
+	if !strings.Contains(err.Error(), "Requires authentication") {
+		t.Errorf("error message should contain the detail value, got: %v", err)
+	}
+}
+
+// TestAPIError_UsesErrorMessageField verifies that error_message is used when
+// detail is absent.
+func TestAPIError_UsesErrorMessageField(t *testing.T) {
+	_, c := newTestServer(t, func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error_message": "Invalid tag expiration",
+			"error_type":    "invalid_request",
+		})
+	})
+	_, err := c.GetRepository(context.Background(), "org/repo")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if strings.Contains(err.Error(), `"error_message"`) {
+		t.Errorf("error message contains raw JSON key — error_message field was not extracted: %v", err)
+	}
+	if !strings.Contains(err.Error(), "Invalid tag expiration") {
+		t.Errorf("error message should contain the error_message value, got: %v", err)
+	}
+}
+
 // ----- Invalid / non-JSON response body -----------------------------------
 
 func TestAPIError_NonJSONErrorBody(t *testing.T) {
