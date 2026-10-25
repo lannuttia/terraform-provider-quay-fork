@@ -79,6 +79,7 @@ resource "quay_repository_notification" "main_build_email" {
 - `flowdock` (Attributes) Deliver notifications to a Flowdock flow. (see [below for nested schema](#nestedatt--flowdock))
 - `hipchat` (Attributes) Deliver notifications to a HipChat room. (see [below for nested schema](#nestedatt--hipchat))
 - `quay_notification` (Attributes) Deliver notifications as in-app alerts in the Quay web UI to a specific user or team. The recipient must be a member of the repository's namespace. (see [below for nested schema](#nestedatt--quay_notification))
+- `repo_image_expiry` (Attributes) Trigger when an image in the repository is due to expire. (see [below for nested schema](#nestedatt--repo_image_expiry))
 - `repo_mirror_sync_failed` (Attributes) Trigger when a repository mirror sync fails. (see [below for nested schema](#nestedatt--repo_mirror_sync_failed))
 - `repo_mirror_sync_started` (Attributes) Trigger when a repository mirror sync starts. (see [below for nested schema](#nestedatt--repo_mirror_sync_started))
 - `repo_mirror_sync_success` (Attributes) Trigger when a repository mirror sync succeeds. (see [below for nested schema](#nestedatt--repo_mirror_sync_success))
@@ -174,6 +175,14 @@ Required:
 - `kind` (String) The kind of target: "user" to notify an individual Quay account, or "team" to notify all members of an organization team.
 - `name` (String) The Quay username or team name to notify.
 
+
+
+<a id="nestedatt--repo_image_expiry"></a>
+### Nested Schema for `repo_image_expiry`
+
+Required:
+
+- `days` (Number) Trigger the notification when the image will expire within this many days.
 
 
 <a id="nestedatt--repo_mirror_sync_failed"></a>

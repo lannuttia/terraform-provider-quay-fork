@@ -170,6 +170,51 @@ resource "quay_repository_notification" "test" {
 	})
 }
 
+// TestAccRepositoryNotification_repoImageExpiry verifies that a
+// repo_image_expiry notification can be created and read back correctly.
+// Without modelling this event, importing a UI-created notification of this
+// type fails with "Unknown Notification Event ... please report this as a
+// provider bug".
+func TestAccRepositoryNotification_repoImageExpiry(t *testing.T) {
+	skipIfNoAcc(t)
+	orgName := rname("tf-acc-expiry-org")
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: providerFactories(),
+		CheckDestroy: resource.ComposeTestCheckFunc(
+			checkOrganizationDestroyed(orgName),
+			checkRepositoryDestroyed(orgName+"/expiry-repo"),
+			checkNotificationDestroyed("quay_repository_notification.test"),
+		),
+		Steps: []resource.TestStep{
+			{
+				Config: providerConfig() + fmt.Sprintf(`
+resource "quay_organization" "test" {
+  name  = %q
+  email = "tf-acc-expiry@example.com"
+}
+resource "quay_repository" "test" {
+  namespace   = quay_organization.test.name
+  name        = "expiry-repo"
+  visibility  = "private"
+  description = ""
+}
+resource "quay_repository_notification" "test" {
+  repository       = quay_repository.test.id
+  title            = "image expiry alert"
+  webhook          = { url = "https://httpbin.org/post" }
+  repo_image_expiry = { days = 7 }
+}
+`, orgName),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttrSet("quay_repository_notification.test", "uuid"),
+					resource.TestCheckResourceAttr("quay_repository_notification.test", "repo_image_expiry.days", "7"),
+				),
+			},
+		},
+	})
+}
+
 func TestAccRepositoryNotification_buildWithRefRegex(t *testing.T) {
 	skipIfNoAcc(t)
 	orgName := rname("tf-acc-build-org")

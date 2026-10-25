@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/objectplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -50,6 +51,7 @@ type RepositoryNotificationResourceModel struct {
 	RepoMirrorSyncStarted *RepoMirrorSyncStartedEvent `tfsdk:"repo_mirror_sync_started"`
 	RepoMirrorSyncSuccess *RepoMirrorSyncSuccessEvent `tfsdk:"repo_mirror_sync_success"`
 	RepoMirrorSyncFailed  *RepoMirrorSyncFailedEvent  `tfsdk:"repo_mirror_sync_failed"`
+	RepoImageExpiry       *RepoImageExpiryEvent       `tfsdk:"repo_image_expiry"`
 }
 
 type WebhookConfig struct {
@@ -99,6 +101,10 @@ type RepoMirrorSyncStartedEvent struct{}
 type RepoMirrorSyncSuccessEvent struct{}
 type RepoMirrorSyncFailedEvent struct{}
 
+type RepoImageExpiryEvent struct {
+	Days types.Int64 `tfsdk:"days"`
+}
+
 func NewRepositoryNotificationResource() resource.Resource {
 	return &RepositoryNotificationResource{}
 }
@@ -121,6 +127,7 @@ func buildEventAttributes(requiresReplace []planmodifier.String) map[string]sche
 func (r *RepositoryNotificationResource) Schema(_ context.Context, _ resource.SchemaRequest, resp *resource.SchemaResponse) {
 	requiresReplaceStr := []planmodifier.String{stringplanmodifier.RequiresReplace()}
 	requiresReplaceObj := []planmodifier.Object{objectplanmodifier.RequiresReplace()}
+	requiresReplaceInt := []planmodifier.Int64{int64planmodifier.RequiresReplace()}
 
 	resp.Schema = schema.Schema{
 		Description: "Manages a notification on a Quay repository. " +
@@ -332,6 +339,18 @@ func (r *RepositoryNotificationResource) Schema(_ context.Context, _ resource.Sc
 				PlanModifiers: requiresReplaceObj,
 				Attributes:    map[string]schema.Attribute{},
 			},
+			"repo_image_expiry": schema.SingleNestedAttribute{
+				Optional:      true,
+				Description:   "Trigger when an image in the repository is due to expire.",
+				PlanModifiers: requiresReplaceObj,
+				Attributes: map[string]schema.Attribute{
+					"days": schema.Int64Attribute{
+						Required:      true,
+						Description:   "Trigger the notification when the image will expire within this many days.",
+						PlanModifiers: requiresReplaceInt,
+					},
+				},
+			},
 		},
 	}
 }
@@ -359,6 +378,7 @@ func (r *RepositoryNotificationResource) ConfigValidators(_ context.Context) []r
 			path.MatchRoot("repo_mirror_sync_started"),
 			path.MatchRoot("repo_mirror_sync_success"),
 			path.MatchRoot("repo_mirror_sync_failed"),
+			path.MatchRoot("repo_image_expiry"),
 		),
 	}
 }
@@ -523,6 +543,8 @@ func (m *RepositoryNotificationResourceModel) eventAndConfig() (string, map[stri
 		}
 		idx, _ := client.VulnerabilityLevelIndexFromString(m.VulnerabilityFound.Level.ValueString())
 		return "vulnerability_found", map[string]any{"level": idx}
+	case m.RepoImageExpiry != nil:
+		return "repo_image_expiry", map[string]any{"days": m.RepoImageExpiry.Days.ValueInt64()}
 	case m.RepoMirrorSyncStarted != nil:
 		return "repo_mirror_sync_started", map[string]any{}
 	case m.RepoMirrorSyncSuccess != nil:
@@ -607,6 +629,7 @@ func (r *RepositoryNotificationResource) mapToState(notif *client.Notification, 
 	state.RepoMirrorSyncStarted = nil
 	state.RepoMirrorSyncSuccess = nil
 	state.RepoMirrorSyncFailed = nil
+	state.RepoImageExpiry = nil
 
 	switch notif.Event {
 	case "repo_push":
@@ -637,6 +660,14 @@ func (r *RepositoryNotificationResource) mapToState(notif *client.Notification, 
 		state.RepoMirrorSyncSuccess = &RepoMirrorSyncSuccessEvent{}
 	case "repo_mirror_sync_failed":
 		state.RepoMirrorSyncFailed = &RepoMirrorSyncFailedEvent{}
+	case "repo_image_expiry":
+		var days types.Int64
+		if v, ok := notif.EventConfig["days"]; ok && v != nil {
+			days = types.Int64Value(int64(v.(float64)))
+		} else {
+			days = types.Int64Null()
+		}
+		state.RepoImageExpiry = &RepoImageExpiryEvent{Days: days}
 	default:
 		diags.AddError("Unknown Notification Event",
 			fmt.Sprintf("The Quay API returned an unrecognised notification event %q. "+
